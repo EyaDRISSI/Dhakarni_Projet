@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "256403201640",
+    "firebase_url": "https://dhakarni-3aeba-default-rtdb.firebaseio.com",
+    "project_id": "dhakarni-3aeba",
+    "storage_bucket": "dhakarni-3aeba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:256403201640:android:953ec73b743cbcfd4925dd",
+        "android_client_info": {
+          "package_name": "com.example.dhakarni_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALxxd3MYG9IPsG7oe8AzXcycXOMf9vOJ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
