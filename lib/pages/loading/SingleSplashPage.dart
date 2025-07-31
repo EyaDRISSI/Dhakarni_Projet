@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../auth/login.dart'; 
-/// Page d'introduction (Splash Screen) affichant des contenus défilants.
-/// Utilise `SingleTickerProviderStateMixin` pour les animations.
+
+
+
 class SingleSplashPage extends StatefulWidget {
   const SingleSplashPage({Key? key}) : super(key: key);
 
@@ -11,14 +12,11 @@ class SingleSplashPage extends StatefulWidget {
 
 class _SingleSplashPageState extends State<SingleSplashPage>
     with SingleTickerProviderStateMixin {
-  // Index du contenu actuel affiché dans le splash screen.
   int _currentIndex = 0;
-  // Contrôleur d'animation pour gérer les transitions de fondu.
+
   late AnimationController _animationController;
-  // Animation de type `double` pour l'opacité.
   late Animation<double> _animation;
 
-  // Liste des contenus pour chaque écran du splash screen.
   final List<SplashScreenContent> _contents = [
     SplashScreenContent(
       imagePath: 'assets/Man-With-Phone.png',
@@ -39,28 +37,23 @@ class _SingleSplashPageState extends State<SingleSplashPage>
     ),
   ];
 
-  // Durée de la transition entre les contenus.
   final Duration _transitionDuration = const Duration(milliseconds: 100);
 
   @override
   void initState() {
     super.initState();
-    // Initialisation du contrôleur d'animation.
     _animationController = AnimationController(
       vsync: this,
       duration: _transitionDuration,
     );
-    // Définition de l'animation de fondu avec une courbe d'accélération.
     _animation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeIn,
     );
 
-    // Démarre l'animation de fondu pour le premier contenu.
     _animationController.forward();
   }
 
-  /// Navigue vers la page de connexion, en remplaçant la pile de routes.
   void _navigateToLogin() {
     if (mounted) {
       Navigator.pushReplacement(
@@ -70,27 +63,23 @@ class _SingleSplashPageState extends State<SingleSplashPage>
     }
   }
 
-  /// Gère l'action du bouton "Passer".
   void _onNextPressed() {
     if (_currentIndex < _contents.length - 1) {
-      // Si ce n'est pas le dernier écran, anime la sortie, puis change de contenu et anime l'entrée.
       _animationController.reverse().then((_) {
         if (mounted) {
           setState(() {
-            _currentIndex++; // Passe à l'écran suivant.
+            _currentIndex++; 
           });
-          _animationController.forward(); // Anime l'entrée du nouveau contenu.
+          _animationController.forward(); 
         }
       });
     } else {
-      // Si c'est le dernier écran, navigue vers la page de connexion.
       _navigateToLogin();
     }
   }
 
   @override
   void dispose() {
-    // Libère les ressources du contrôleur d'animation lors de la suppression du widget.
     _animationController.dispose();
     super.dispose();
   }
@@ -100,15 +89,12 @@ class _SingleSplashPageState extends State<SingleSplashPage>
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // Dimensions de base du design Figma pour le calcul des échelles.
     const double figmaBaseWidth = 355;
     const double figmaBaseHeight = 812;
 
-    // Calcul des facteurs d'échelle pour adapter les tailles aux différentes résolutions d'écran.
     final double widthScale = screenWidth / figmaBaseWidth;
     final double heightScale = screenHeight / figmaBaseHeight;
 
-    // Contenu actuel à afficher basé sur l'index.
     SplashScreenContent currentContent = _contents[_currentIndex];
 
     String? backgroundImagePath = _currentIndex == 0 || _currentIndex == 1
@@ -259,7 +245,6 @@ class _SingleSplashPageState extends State<SingleSplashPage>
                   ),
                 ),
               ),
-              // Deuxième image flottante.
               Positioned(
                 bottom: screenHeight * 0.09, 
                 left: screenWidth * 0.02, 
@@ -283,9 +268,9 @@ class _SingleSplashPageState extends State<SingleSplashPage>
 }
 
 class SplashScreenContent {
-  final String imagePath;     // Chemin de l'image à afficher.
-  final String title;         // Titre de l'écran.
-  final String description;   // Description de l'écran.
+  final String imagePath;
+  final String title;        
+  final String description; 
 
   SplashScreenContent({
     required this.imagePath,

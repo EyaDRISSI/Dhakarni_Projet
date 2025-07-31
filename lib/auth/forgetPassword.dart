@@ -14,14 +14,14 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>(); 
-  final TextEditingController _emailController = TextEditingController(); // Contrôleur pour le champ email.
-  bool _isLoading = false; // Indique si une opération de chargement est en cours.
+  final TextEditingController _emailController = TextEditingController(); 
+  bool _isLoading = false; 
 
-  /// Tente d'envoyer un email de réinitialisation de mot de passe.
+  // envoyer un email de réinitialisation de mot de passe.
   void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
-        _isLoading = true; // Active l'indicateur de chargement.
+        _isLoading = true; 
       });
 
       try {
@@ -35,13 +35,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           'Email envoyé',
           'Un lien de réinitialisation de mot de passe a été envoyé à votre adresse email.',
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green, // Couleur pour le succès.
+          backgroundColor: Colors.green, 
           colorText: Colors.white,
           duration: const Duration(seconds: 5),
         );
         // Retourne automatiquement à la page de connexion après 3 secondes.
         Future.delayed(const Duration(seconds: 3), () {
-          Get.offAll(() => const LoginPage()); // Redirige vers LoginPage et efface l'historique de navigation.
+          Get.offAll(() => const LoginPage()); 
         });
       } on FirebaseAuthException catch (e) {
         log('DEBUG_TIME: Erreur Firebase Auth lors de la réinitialisation du mot de passe: ${e.code} - ${e.message}');
@@ -82,7 +82,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         print("Unexpected Error during password reset: $e");
       } finally {
         setState(() {
-          _isLoading = false; // Désactive l'indicateur de chargement.
+          _isLoading = false; 
         });
       }
     } else {
@@ -98,7 +98,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   @override
   void dispose() {
-    _emailController.dispose(); // Libère les ressources du contrôleur de texte.
+    _emailController.dispose(); 
     super.dispose();
   }
 
@@ -152,7 +152,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
                 Column(
                   children: [
-                    // Zone supérieure avec image et logo
                     Container(
                       height: 421 * heightScale,
                       child: Stack(
@@ -186,7 +185,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         ],
                       ),
                     ),
-                    // Formulaire de réinitialisation de mot de passe
+
                     Expanded(
                       child: Padding(
                         padding: EdgeInsets.symmetric(
@@ -217,7 +216,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                 style: TextStyle(fontSize: 16 * widthScale),
                               ),
                               SizedBox(height: 8 * heightScale),
-                              // Champ de saisie de l'email
+
                               TextFormField(
                                 controller: _emailController,
                                 decoration: _buildInputDecoration('Insérer votre email'),
@@ -225,7 +224,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               ),
 
                               SizedBox(height: 30 * heightScale),
-                              // Bouton d'envoi du lien de réinitialisation
+
                               SizedBox(
                                 width: double.infinity,
                                 height: 49 * heightScale,
@@ -249,11 +248,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               ),
 
                               SizedBox(height: 10 * heightScale),
-                              // Bouton de retour à la connexion
+
                               Align(
                                 alignment: Alignment.center,
                                 child: TextButton(
-                                  onPressed: () => Get.back(), // Retourne à la page précédente.
+                                  onPressed: () => Get.back(), 
                                   child: const Text(
                                     'Retour à la connexion',
                                     style: TextStyle(
@@ -295,7 +294,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     );
   }
 
-  /// Valide le format de l'email.
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Veuillez entrer votre email.';

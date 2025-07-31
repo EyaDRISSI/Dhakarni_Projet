@@ -19,12 +19,11 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   bool _isPasswordVisible = false; // Gère la visibilité du mot de passe.
   final _formKey = GlobalKey<FormState>(); 
-  final TextEditingController _emailController = TextEditingController(); // Contrôleur pour le champ email.
-  final TextEditingController _passwordController = TextEditingController(); // Contrôleur pour le champ mot de passe.
+  final TextEditingController _emailController = TextEditingController(); 
+  final TextEditingController _passwordController = TextEditingController(); 
 
-  bool _isLoading = false; // Indique si une opération de connexion est en cours.
+  bool _isLoading = false; 
 
-  // Utilise Get.find pour récupérer l'instance du UserController,
   final UserController _userController = Get.find<UserController>();
 
   /// Effectue l'opération de connexion de l'utilisateur.
@@ -69,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
           'Erreur de connexion',
           errorMessage,
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: snackBarColor, // Utilise la couleur déterminée.
+          backgroundColor: snackBarColor,
           colorText: Colors.white,
           duration: const Duration(seconds: 5),
         );
@@ -87,7 +86,7 @@ class _LoginPageState extends State<LoginPage> {
         print("Unexpected Error during login: $e");
       } finally {
         setState(() {
-          _isLoading = false; // Désactive toujours l'indicateur de chargement.
+          _isLoading = false; 
         });
       }
     } else {
@@ -103,8 +102,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
-    _emailController.dispose(); // Libère les ressources du contrôleur d'email.
-    _passwordController.dispose(); // Libère les ressources du contrôleur de mot de passe.
+    _emailController.dispose(); 
+    _passwordController.dispose(); // Libère les ressources 
     super.dispose();
   }
 
@@ -117,7 +116,6 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
 
-    // Obtient les dimensions de l'écran pour un design adaptatif.
     final double screenHeight = MediaQuery.of(context).size.height;
     final double screenWidth = MediaQuery.of(context).size.width;
     const double figmaBaseWidth = 375;
@@ -133,7 +131,6 @@ class _LoginPageState extends State<LoginPage> {
           child: IntrinsicHeight(
             child: Stack(
               children: [
-                // Fond dégradé
                 Positioned.fill(
                   child: Container(
                     decoration: const BoxDecoration(
@@ -161,7 +158,6 @@ class _LoginPageState extends State<LoginPage> {
 
                 Column(
                   children: [
-                    // Zone supérieure avec image et logo
                     Container(
                       height: 421 * heightScale,
                       child: Stack(
@@ -195,7 +191,6 @@ class _LoginPageState extends State<LoginPage> {
                         ],
                       ),
                     ),
-                    // Formulaire de connexion
                     Expanded(
                       child: Padding(
                         padding: EdgeInsets.symmetric(
@@ -212,7 +207,6 @@ class _LoginPageState extends State<LoginPage> {
                                 style: TextStyle(fontSize: 16 * widthScale),
                               ),
                               SizedBox(height: 8 * heightScale),
-                              // Champ de saisie de l'email
                               TextFormField(
                                 controller: _emailController,
                                 decoration: _buildInputDecoration('Insérer votre email'),
@@ -225,13 +219,13 @@ class _LoginPageState extends State<LoginPage> {
                                 style: TextStyle(fontSize: 16 * widthScale),
                               ),
                               SizedBox(height: 8 * heightScale),
-                              // Champ de saisie du mot de passe
+
                               TextFormField(
                                 controller: _passwordController,
-                                obscureText: !_isPasswordVisible, // Contrôle la visibilité du texte.
+                                obscureText: !_isPasswordVisible, 
                                 decoration: _buildInputDecoration(
                                   'Insérer un mot de passe',
-                                  isPassword: true, // Indique que c'est un champ de mot de passe pour l'icône.
+                                  isPassword: true, 
                                 ),
                                 validator: _validatePassword,
                               ),
@@ -249,7 +243,6 @@ class _LoginPageState extends State<LoginPage> {
                               ),
 
                               SizedBox(height: 10 * heightScale),
-                              // Bouton de connexion
                               SizedBox(
                                 width: double.infinity,
                                 height: 49 * heightScale,
@@ -366,7 +359,7 @@ class ConcentricCirclesPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final Paint paint = Paint()
-      ..color = Colors.grey.shade300.withOpacity(opacity) // Couleur des cercles avec opacité.
+      ..color = Colors.grey.shade300.withOpacity(opacity) 
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0; 
 

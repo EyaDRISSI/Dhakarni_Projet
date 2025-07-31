@@ -26,9 +26,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
   @override
   void initState() {
     super.initState();
-    if (_auth.currentUser != null && !_auth.currentUser!.emailVerified) {
-      sendVerificationEmail();
-    }
+
     timer = Timer.periodic(const Duration(seconds: 3), (_) => checkEmailVerified());
   }
 
@@ -49,9 +47,9 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
             'Email de vérification envoyé',
             'Veuillez vérifier votre boîte de réception (et vos spams) pour le lien de vérification. Si vous ne le voyez pas, essayez de le renvoyer après quelques instants.',
             snackPosition: SnackPosition.TOP,
-            backgroundColor: Colors.blueAccent,
+            backgroundColor: Color(0xFFE91E63),
             colorText: Colors.white,
-            duration: const Duration(seconds: 7),
+            duration: const Duration(seconds: 9),
           );
         } else {
           log('DEBUG_TIME: Email for ${user.email} is already verified.');
@@ -214,7 +212,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                           children: [
                             SizedBox(height: 20 * heightScale),
                             Text(
-                              'Vérifiez votre adresse e-mail',
+                              'Vérifiez Votre E-mail !',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 24 * widthScale,
@@ -224,22 +222,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                             ),
                             SizedBox(height: 20 * heightScale),
                             Text(
-                              'Un e-mail de vérification a été envoyé à l\'adresse :',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 16 * widthScale, color: Colors.grey[700]),
-                            ),
-                            Text(
-                              _auth.currentUser?.email ?? 'votre e-mail',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 18 * widthScale,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            SizedBox(height: 20 * heightScale),
-                            Text(
-                              'Veuillez cliquer sur le lien de vérification dans cet e-mail pour activer votre compte. Vérifiez également votre dossier de spams.',
+                              'Veuillez vérifier votre boîte de réception pour un e-mail de vérification.',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 16 * widthScale, color: Colors.grey[700]),
                             ),
@@ -256,7 +239,7 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
                               child: _isSendingEmail
                                   ? CircularProgressIndicator(color: Colors.white)
                                   : Text(
-                                'Renvoyer l\'email',
+                                'Vérifiez mon e-mail',
                                 style: TextStyle(fontSize: 18 * widthScale, color: Colors.white),
                               ),
                             ),
@@ -285,4 +268,3 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
     );
   }
 }
-

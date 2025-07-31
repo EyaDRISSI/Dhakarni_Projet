@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controller/user_controller.dart'; 
-import 'create-warranty.dart'; 
+import '../warranty/add-warranty/add_warranty_page.dart'; 
 import '../my-account.dart';   
 
 class WarrantyHomePage extends StatefulWidget {
@@ -14,12 +14,12 @@ class WarrantyHomePage extends StatefulWidget {
 class _WarrantyHomePageState extends State<WarrantyHomePage> {
   int _selectedIndex = 0;
   static final List<Widget> _widgetOptions = <Widget>[
-    const _WarrantyHomeContent(), // Une classe interne pour le contenu de la page d'accueil
-    const AddWarrantyPage(),      // Page pour ajouter une garantie
-    const MyAccountPage(),        // Page de mon compte
+    const _WarrantyHomeContent(), 
+    const AddWarrantyPage(),      
+    const MyAccountPage(),        
   ];
 
-  /// Met à jour l'index sélectionné et navigue vers la page correspondante.
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -34,7 +34,7 @@ class _WarrantyHomePageState extends State<WarrantyHomePage> {
       backgroundColor: Colors.white, 
       appBar: AppBar(
         toolbarHeight: 0,
-        automaticallyImplyLeading: false, // Supprime le bouton retour par défaut.
+        automaticallyImplyLeading: false,
       ),
       body: _widgetOptions.elementAt(_selectedIndex),
 
@@ -54,7 +54,7 @@ class _WarrantyHomePageState extends State<WarrantyHomePage> {
             label: 'Mon compte',
           ),
         ],
-        currentIndex: _selectedIndex, // L'élément sélectionné est mis à jour dynamiquement.
+        currentIndex: _selectedIndex,
         selectedItemColor: const Color(0xFFE91E63), 
         unselectedItemColor: Colors.grey, 
         onTap: _onItemTapped,
@@ -72,8 +72,7 @@ class _WarrantyHomeContent extends StatelessWidget {
 
     return Column(
       children: [
-        // Section supérieure avec salutation, nom et barre de recherche (fond rose).
-        Container(
+         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20.0, 40.0, 20.0, 60.0), 
           decoration: const BoxDecoration(
@@ -88,12 +87,12 @@ class _WarrantyHomeContent extends StatelessWidget {
                 children: [
                   Obx(() {
                     final user = userController.currentUser.value;
-                    String greetingName = 'Cher client'; // Salutation par défaut.
+                    String greetingName = 'Cher client'; 
                     if (user != null) {
                       if (user.prenom.isNotEmpty) {
                         greetingName = user.prenom;
                         if (user.nom.isNotEmpty) {
-                          greetingName += ' ${user.nom}'; // Affiche le nom de famille complet.
+                          greetingName += ' ${user.nom}';
                         }
                       } else if (user.nom.isNotEmpty) {
                         greetingName = user.nom;
@@ -129,7 +128,6 @@ class _WarrantyHomeContent extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 20),
-              // Barre de recherche.
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
                 decoration: BoxDecoration(
@@ -160,7 +158,7 @@ class _WarrantyHomeContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: <Widget>[
                 Image.asset(
-                  'assets/Email sent.png', // Image pour le visuel "pas de garantie".
+                  'assets/Email sent.png', 
                   width: 150,
                   height: 150,
                   opacity: const AlwaysStoppedAnimation(0.8),
@@ -186,14 +184,12 @@ class _WarrantyHomeContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 30),
 
-                // Bouton "Ajouter Garantie".
                 SizedBox(
                   width: double.infinity,
                   height: 55,
                   child: ElevatedButton(
                     onPressed: () {
-                      // Navigue vers la page d'ajout de garantie lors du clic.
-                      Get.to(() => const ());
+                      Get.to(() => const AddWarrantyPage());
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFE91E63), 

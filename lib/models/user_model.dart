@@ -1,23 +1,20 @@
 import 'package:firebase_database/firebase_database.dart'; 
 
-/// Représente le modèle de données pour un utilisateur de l'application.
 class UserModel {
-  // Propriétés obligatoires
-  final String userId;      // L'identifiant unique de l'utilisateur, généralement fourni par Firebase Auth.
-  final String prenom;      // Le prénom de l'utilisateur.
-  final String nom;         // Le nom de famille de l'utilisateur.
-  final String email;       // L'adresse email de l'utilisateur.
-
-  // Propriétés optionnelles (peuvent être nulles)
-  final String? status;         // Le statut de l'utilisateur (ex: 'Particulier' ou 'Entreprise').
-  final String? address;        // L'adresse physique de l'utilisateur.
-  final String? mobileNumber;   // Le numéro de téléphone portable de l'utilisateur.
-  final String? registrationDate; // La date d'inscription de l'utilisateur, stockée comme une chaîne de caractères (ISO 8601).
-  final String? birthDate;      // La date de naissance de l'utilisateur, stockée comme une chaîne de caractères.
-  final String? website;        // Le site web de l'utilisateur (pour les entreprises ou profils spécifiques).
+  
+  final String userId;     
+  final String prenom;      
+  final String nom;         
+  final String email;       
+  final String? status;        
+  final String? address;        
+  final String? mobileNumber;   
+  final String? registrationDate; 
+  final String? birthDate;      
+  final String? website;        
 
   /// Constructeur de la classe `UserModel`.
-  /// Prend des paramètres obligatoires et optionnels pour initialiser un objet UserModel.
+  ///   initialiser un objet UserModel.
   UserModel({
     required this.userId,
     required this.email,
@@ -32,7 +29,6 @@ class UserModel {
   });
 
   
-  /// Le casting `as String` ou `as String?` est utilisé pour garantir la sécurité des types.
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
       userId: map['userId'] as String,
@@ -49,8 +45,6 @@ class UserModel {
   }
 
   /// Méthode pour convertir l'instance actuelle de `UserModel` en un `Map<String, dynamic>`.
-  /// Ceci est utilisé pour préparer les données de l'utilisateur avant de les envoyer
-  /// à Firebase Realtime Database pour le stockage.
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
