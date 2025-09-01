@@ -1,94 +1,119 @@
 import 'package:get/get.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:developer';
 import 'dart:io';
 import 'package:uuid/uuid.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import './notification_controller.dart';
 import '../models/warranty_model.dart';
-import '../controller/product_controller.dart';
 import '../models/product_model.dart';
+import './product_controller.dart';
 import '../models/product_category_model.dart';
 
+const String CLOUDINARY_CLOUD_NAME = 'ddwjxlj6e';
+const String CLOUDINARY_UPLOAD_PRESET = 'Dhakarni';
 
 class WarrantyController extends GetxController {
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   final Uuid _uuid = const Uuid();
-
   late final ProductController _productController;
+  late final NotificationController _notificationController;
 
-  RxList<WarrantyModel> warranties = <WarrantyModel>[].obs;
-  RxBool isLoading = false.obs;
-  RxString errorMessage = ''.obs;
-  RxString successMessage = ''.obs;
+  final RxList<WarrantyModel> _allWarranties = <WarrantyModel>[].obs;
+  final RxList<WarrantyModel> filteredWarranties = <WarrantyModel>[].obs;
+
+  List<WarrantyModel> get allWarranties => _allWarranties.toList();
+  final RxBool isLoading = false.obs;
+  final RxString errorMessage = ''.obs;
+  final RxString successMessage = ''.obs;
+  final RxString userId = ''.obs;
+  final RxString searchTerm = ''.obs;
 
   @override
   void onInit() {
     super.onInit();
-    log('DEBUG_TIME: [WarrantyController] Initialisation du contrôleur de garantie.');
     try {
       _productController = Get.find<ProductController>();
-      log('DEBUG_TIME: [WarrantyController] ProductController trouvé et initialisé.');
+      _notificationController = Get.find<NotificationController>();
       FirebaseAuth.instance.authStateChanges().listen((User? user) {
         if (user != null) {
+          userId.value = user.uid;
           fetchWarrantiesByUserId(user.uid);
         } else {
-          warranties.clear();
+          _allWarranties.clear();
+          filteredWarranties.clear();
+          userId.value = '';
         }
       });
+      debounce(searchTerm, (_) => filterWarranties(searchTerm.value),
+          time: const Duration(milliseconds: 300));
     } catch (e) {
-      log('ERROR: [WarrantyController] ProductController non trouvé. Assurez-vous de l\'initialiser avec Get.put() au démarrage de votre application. Erreur: $e');
-      errorMessage.value = "Erreur critique: Le contrôleur de produits n'a pas été initialisé.";
+      errorMessage.value =
+          "Erreur critique: Le contrôleur de produits n'a pas été initialisé.";
     }
   }
 
-  String generateUniqueId() {
-    return _uuid.v4();
+  void filterWarranties(String query) {
+    if (query.isEmpty) {
+      filteredWarranties.assignAll(_allWarranties);
+    } else {
+      final lowerCaseQuery = query.toLowerCase();
+      filteredWarranties.assignAll(_allWarranties.where((warranty) {
+        final productName = warranty.product?.productName.toLowerCase() ?? '';
+        return productName.contains(lowerCaseQuery);
+      }).toList());
+    }
   }
+
+  String generateUniqueId() => _uuid.v4();
 
   Future<String?> uploadFile(File file, String folderName) async {
     try {
-      final User? currentUser = FirebaseAuth.instance.currentUser;
-      final String userId = currentUser?.uid ?? 'anonymous';
+      final url = Uri.parse(
+          'https://api.cloudinary.com/v1_1/$CLOUDINARY_CLOUD_NAME/image/upload');
 
-      final String fileName = '$folderName/${userId}/${generateUniqueId()}_${file.path.split('/').last}';
-      final Reference storageRef = _storage.ref().child(fileName);
-      final UploadTask uploadTask = storageRef.putFile(file);
-      final TaskSnapshot snapshot = await uploadTask;
-      final String downloadUrl = await snapshot.ref.getDownloadURL();
-      log('DEBUG_TIME: [WarrantyController] Fichier uploadé: $downloadUrl');
-      return downloadUrl;
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = CLOUDINARY_UPLOAD_PRESET
+        ..fields['folder'] = folderName
+        ..files.add(
+          await http.MultipartFile.fromPath('file', file.path),
+        );
+
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.bytesToString();
+        final data = json.decode(responseData);
+        final String downloadUrl = data['secure_url'];
+        return downloadUrl;
+      } else {
+        log('Échec de l\'upload, statut: ${response.statusCode}');
+        log('Raison: ${await response.stream.bytesToString()}');
+        return null;
+      }
     } catch (e) {
-      log('DEBUG_TIME: [WarrantyController] Erreur lors de l\'upload du fichier: $e');
-      Get.snackbar(
-        "Erreur d'upload",
-        "Impossible d'uploader le fichier: ${e.toString()}",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      log('Erreur lors de l\'upload vers Cloudinary: $e');
       return null;
     }
   }
 
-  /// Ajoute une nouvelle garantie à la base de données.
-  /// Le 'productCategoryId' est l'ID de la catégorie (ou sous-catégorie) référencée.
-  Future<void> addWarranty({
+  Future<WarrantyModel> addWarranty({
     required String userId,
     required String productName,
     required double price,
     required String manufactureDate,
     required String reference,
-    required String productCategoryId, 
-    required String supplier, 
+    required String productCategoryId,
+    required String productCategoryName,
+    required String productSubCategoryName,
+    required String supplier,
     required String warrantyType,
     File? productPhotoFile,
-    required String startDate,
-    required String endDate,
-    required String purchaseDate,
+    required DateTime startDate,
+    required DateTime endDate,
+    required DateTime purchaseDate,
     required String sellerName,
     File? invoiceFile,
     File? certificateFile,
@@ -99,312 +124,333 @@ class WarrantyController extends GetxController {
     successMessage.value = '';
 
     try {
-      log('DEBUG_TIME: [WarrantyController] Début de l\'ajout de la garantie pour: $productName (User ID: $userId)');
+      final ProductCategoryModel? parentCategory = _productController
+          .productCategories
+          .firstWhereOrNull((cat) => cat.categoryId == productCategoryId);
+      final ProductCategoryModel? subCategory = parentCategory?.subCategories
+          .firstWhereOrNull((sub) => sub.categoryName == productSubCategoryName);
 
-      
-      ProductCategoryModel? existingProductCategoryDefinition = _productController.findProductCategoryById(productCategoryId);
-      if (existingProductCategoryDefinition == null) {
-        throw Exception("La catégorie de produit avec l'ID '$productCategoryId' n'existe pas. Veuillez la créer d'abord.");
+      final ProductCategoryModel? finalProductCategory;
+      if (parentCategory != null && subCategory != null) {
+        finalProductCategory = ProductCategoryModel(
+          categoryId: parentCategory.categoryId,
+          categoryName: parentCategory.categoryName,
+          subCategories: [subCategory],
+        );
       } else {
-        log('DEBUG_TIME: [WarrantyController] Définition de catégorie de produit existante trouvée: ${existingProductCategoryDefinition.categoryName} (ID: $productCategoryId)');
+        throw Exception("Catégorie ou sous-catégorie non trouvée.");
       }
 
-     
-      ProductModel? product;
-      // Chercher le produit par référence (qui devrait être unique par produit)
-      product = _productController.products.firstWhereOrNull((p) => p.reference == reference);
+      ProductModel? existingProduct = _productController.products
+          .firstWhereOrNull((p) => p.reference == reference);
 
-      String? productImageUrl;
-      if (productPhotoFile != null) {
-        productImageUrl = await uploadFile(productPhotoFile, 'product_photos');
-        if (productImageUrl == null) {
-          throw Exception("Échec de l'upload de la photo du produit.");
-        }
-        log('DEBUG_TIME: [WarrantyController] Photo produit uploadée: $productImageUrl');
-      }
-
-      String finalProductId;
-      if (product != null) {
-        // Mettre à jour le produit existant
-        finalProductId = product.productId;
-        final updatedProduct = ProductModel(
-          productId: product.productId,
+      final ProductModel finalProduct;
+      if (existingProduct != null) {
+        finalProduct = existingProduct.copyWith(
           productName: productName,
-          productCategoryId: productCategoryId,
+          productCategory: finalProductCategory,
           price: price,
           reference: reference,
           manufacturingDate: manufactureDate,
-          productPhotoUrl: productImageUrl ?? product.productPhotoUrl, // Conserver l'URL existante si pas de nouvelle photo
-          supplier: supplier, 
+          supplier: supplier,
         );
-        await _productController.updateProduct(updatedProduct);
-        log('DEBUG_TIME: [WarrantyController] Produit existant mis à jour: ${updatedProduct.productName}');
+        await _productController.updateProduct(finalProduct);
       } else {
         final newProduct = ProductModel(
-          productId: '', 
+          productId: generateUniqueId(),
           productName: productName,
-          productCategoryId: productCategoryId,
+          productCategory: finalProductCategory,
           price: price,
           reference: reference,
           manufacturingDate: manufactureDate,
-          productPhotoUrl: productImageUrl,
-          supplier: supplier, 
+          supplier: supplier,
         );
-        // addProduct retourne le ProductModel avec l'ID généré par Firebase
-        final ProductModel addedProduct = await _productController.addProduct(newProduct);
-        finalProductId = addedProduct.productId; 
-        log('DEBUG_TIME: [WarrantyController] Nouveau produit créé avec ID: $finalProductId');
+        finalProduct = await _productController.addProduct(newProduct);
       }
+      
+      String? productPhotoUrl;
+      String? invoiceUrl;
+      String? certificateUrl;
 
-      // --- 3. Uploader les fichiers spécifiques à la garantie (facture, certificat) ---
-      String? uploadedInvoiceUrl;
-      if (invoiceFile != null) {
-        uploadedInvoiceUrl = await uploadFile(invoiceFile, 'invoice_files');
-        if (uploadedInvoiceUrl == null) {
-          throw Exception("Échec de l'upload du fichier de facture.");
-        }
-        log('DEBUG_TIME: [WarrantyController] Facture uploadée: $uploadedInvoiceUrl');
-      }
+      await Future.wait([
+        if (productPhotoFile != null)
+          uploadFile(productPhotoFile, 'product_photos').then((url) => productPhotoUrl = url),
+        if (invoiceFile != null)
+          uploadFile(invoiceFile, 'invoice_files').then((url) => invoiceUrl = url),
+        if (certificateFile != null)
+          uploadFile(certificateFile, 'certificate_files').then((url) => certificateUrl = url),
+      ]);
+      
+      final updatedProduct = finalProduct.copyWith(productPhotoUrl: productPhotoUrl);
+      await _productController.updateProduct(updatedProduct);
 
-      String? uploadedCertificateUrl;
-      if (certificateFile != null) {
-        uploadedCertificateUrl = await uploadFile(certificateFile, 'certificate_files');
-        if (uploadedCertificateUrl == null) {
-          throw Exception("Échec de l'upload du fichier de certificat.");
-        }
-        log('DEBUG_TIME: [WarrantyController] Certificat uploadé: $uploadedCertificateUrl');
-      }
-
-      // Créer le modèle de garantie ---
       final String warrantyId = generateUniqueId();
       final WarrantyModel newWarranty = WarrantyModel(
         id: warrantyId,
         userId: userId,
-        productId: finalProductId, 
+        productId: updatedProduct.productId,
         warrantyType: warrantyType,
         startDate: startDate,
         endDate: endDate,
         purchaseDate: purchaseDate,
         sellerName: sellerName,
-        invoiceFilePath: uploadedInvoiceUrl,
-        certificateFilePath: uploadedCertificateUrl,
         notes: notes,
-        createdAt: DateTime.now().toIso8601String(),
+        createdAt: DateTime.now(),
+        product: updatedProduct,
+        invoiceFilePath: invoiceUrl,
+        certificateFilePath: certificateUrl,
       );
 
-      // Enregistrer la garantie dans Firebase Realtime Database ---
-      await _databaseRef.child('warranties_by_user').child(userId).child(newWarranty.id!).set(newWarranty.toJson());
+      await _databaseRef
+          .child('warranties_by_user')
+          .child(userId)
+          .child(newWarranty.id!)
+          .set(newWarranty.toJson());
 
-      // Mettre à jour la liste observable locale si l'utilisateur est le même
-      if (FirebaseAuth.instance.currentUser?.uid == userId) {
-        warranties.add(newWarranty);
-      }
+      _allWarranties.add(newWarranty);
+      filterWarranties(searchTerm.value);
 
       successMessage.value = 'Garantie ajoutée avec succès !';
-      log('DEBUG_TIME: [WarrantyController] Garantie ajoutée avec succès !');
-      Get.snackbar(
-        'Succès',
-        successMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      Get.back(); // Revenir de AddWarrantyPage
+      isLoading.value = false;
+      log('DEBUG: Garantie ajoutée avec succès. Photos et fichiers inclus.');
+
+      return newWarranty;
     } catch (e) {
-      errorMessage.value = 'Erreur lors de l\'ajout de la garantie: ${e.toString()}';
-      log('DEBUG_TIME: [WarrantyController] Erreur lors de l\'ajout de la garantie: $e');
-      Get.snackbar(
-        'Erreur',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
+      errorMessage.value =
+          'Erreur lors de l\'ajout de la garantie: ${e.toString()}';
+      log('ERROR: Erreur dans addWarranty: $e');
+      isLoading.value = false;
+      rethrow;
+    }
+  }
+
+  Future<void> updateWarranty({
+    required WarrantyModel updatedWarranty,
+    File? productPhotoFile,
+    File? invoiceFile,
+    File? certificateFile,
+  }) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+
+    try {
+      if (updatedWarranty.id == null || userId.value.isEmpty) {
+        throw Exception("ID de garantie ou ID utilisateur manquant.");
+      }
+
+      String? productPhotoUrl;
+      String? invoiceUrl;
+      String? certificateUrl;
+
+      await Future.wait([
+        if (productPhotoFile != null)
+          uploadFile(productPhotoFile, 'product_photos').then((url) => productPhotoUrl = url),
+        if (invoiceFile != null)
+          uploadFile(invoiceFile, 'invoice_files').then((url) => invoiceUrl = url),
+        if (certificateFile != null)
+          uploadFile(certificateFile, 'certificate_files').then((url) => certificateUrl = url),
+      ]);
+
+      final updatedProduct = updatedWarranty.product?.copyWith(
+        productPhotoUrl: productPhotoUrl,
       );
+      final newLocalWarranty = updatedWarranty.copyWith(
+        product: updatedProduct,
+        invoiceFilePath: invoiceUrl ?? updatedWarranty.invoiceFilePath,
+        certificateFilePath: certificateUrl ?? updatedWarranty.certificateFilePath,
+      );
+
+      if (updatedProduct != null) {
+        await _productController.updateProduct(updatedProduct);
+      }
+      await _databaseRef
+          .child('warranties_by_user')
+          .child(userId.value)
+          .child(newLocalWarranty.id!)
+          .update(newLocalWarranty.toJson());
+
+      final index = _allWarranties.indexWhere((w) => w.id == updatedWarranty.id);
+      if (index != -1) {
+        _allWarranties[index] = newLocalWarranty;
+        filterWarranties(searchTerm.value);
+      }
+
+      successMessage.value = 'Garantie mise à jour avec succès !';
+    } catch (e) {
+      errorMessage.value = 'Erreur lors de la mise à jour de la garantie: ${e.toString()}';
+      log('ERROR: Erreur dans updateWarranty: $e');
+      rethrow;
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Récupère toutes les garanties pour l'utilisateur actuellement connecté.
-  Future<void> fetchWarrantiesForCurrentUser() async {
-    final User? currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      log('WARNING: [WarrantyController] Aucun utilisateur connecté pour récupérer les garanties.');
-      warranties.clear();
-      return;
-    }
-    await fetchWarrantiesByUserId(currentUser.uid);
-  }
-
-  /// Récupère toutes les garanties associées à un ID utilisateur spécifique.
   Future<void> fetchWarrantiesByUserId(String userId) async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      log('DEBUG_TIME: [WarrantyController] Début de la récupération des garanties pour l\'utilisateur: $userId.');
-      final DatabaseEvent event = await _databaseRef.child('warranties_by_user').child(userId).once();
+      final DatabaseEvent event =
+          await _databaseRef.child('warranties_by_user').child(userId).once();
       final data = event.snapshot.value;
 
       if (data != null && data is Map<dynamic, dynamic>) {
-        final List<WarrantyModel> fetchedWarranties = [];
+        final List<Future<WarrantyModel>> futures = [];
+
         data.forEach((key, value) {
           if (value is Map<dynamic, dynamic>) {
-            fetchedWarranties.add(WarrantyModel.fromMap(Map<String, dynamic>.from(value), id: key));
-          }
-        });
-        warranties.assignAll(fetchedWarranties);
-        log('DEBUG_TIME: [WarrantyController] Garanties récupérées avec succès (${fetchedWarranties.length} trouvées) pour l\'utilisateur $userId.');
-      } else {
-        warranties.clear();
-        log('DEBUG_TIME: [WarrantyController] Aucune garantie trouvée pour l\'utilisateur: $userId.');
-      }
-    } catch (e) {
-      errorMessage.value = 'Erreur lors de la récupération des garanties: ${e.toString()}';
-      log('DEBUG_TIME: [WarrantyController] Erreur lors de la récupération des garanties pour l\'utilisateur $userId: $e');
-      Get.snackbar(
-        'Erreur',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-    } finally {
-      isLoading.value = false;
-    }
-  }
+            final warrantyMap = Map<String, dynamic>.from(value);
+            final warrantyId = key as String;
 
-  /// Récupère une seule garantie par son ID et l'ID de l'utilisateur.
-  Future<WarrantyModel?> getWarrantyByIdAndUserId(String userId, String warrantyId) async {
-    try {
-      log('DEBUG_TIME: [WarrantyController] Récupération de la garantie $warrantyId pour l\'utilisateur $userId.');
-      final DatabaseEvent event = await _databaseRef.child('warranties_by_user').child(userId).child(warrantyId).once();
-      final data = event.snapshot.value;
-      if (data != null && data is Map<dynamic, dynamic>) {
-        log('DEBUG_TIME: [WarrantyController] Garantie trouvée.');
-        return WarrantyModel.fromMap(Map<String, dynamic>.from(data), id: warrantyId);
-      }
-      log('DEBUG_TIME: [WarrantyController] Garantie non trouvée pour ID: $warrantyId et utilisateur: $userId.');
-      return null;
-    } catch (e) {
-      log('DEBUG_TIME: [WarrantyController] Erreur lors de la récupération de la garantie par ID et utilisateur: $e.');
-      return null;
-    }
-  }
-
-  /// Met à jour une garantie existante dans la base de données.
-  Future<void> updateWarranty(String userId, WarrantyModel warranty) async {
-    isLoading.value = true;
-    errorMessage.value = '';
-    successMessage.value = '';
-    try {
-      if (warranty.id == null) {
-        throw Exception("L'ID de la garantie est manquant pour la mise à jour.");
-      }
-      log('DEBUG_TIME: [WarrantyController] Début de la mise à jour de la garantie (ID: ${warranty.id}, User ID: $userId).');
-      await _databaseRef.child('warranties_by_user').child(userId).child(warranty.id!).set(warranty.toJson());
-
-      int index = warranties.indexWhere((w) => w.id == warranty.id);
-      if (index != -1) {
-        warranties[index] = warranty;
-      }
-      successMessage.value = 'Garantie mise à jour avec succès !';
-      log('DEBUG_TIME: [WarrantyController] Garantie mise à jour avec succès.');
-      Get.snackbar(
-        'Succès',
-        successMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-    } catch (e) {
-      errorMessage.value = 'Erreur lors de la mise à jour de la garantie: ${e.toString()}';
-      log('DEBUG_TIME: [WarrantyController] Erreur lors de la mise à jour de la garantie: $e');
-      Get.snackbar(
-        'Erreur',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      rethrow;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /// Supprime une garantie de la base de données.
-  Future<void> deleteWarranty(String userId, String warrantyId) async {
-    isLoading.value = true;
-    errorMessage.value = '';
-    successMessage.value = '';
-    try {
-      log('DEBUG_TIME: [WarrantyController] Début de la suppression de la garantie (ID: $warrantyId, User ID: $userId).');
-      await _databaseRef.child('warranties_by_user').child(userId).child(warrantyId).remove();
-      warranties.removeWhere((w) => w.id == warrantyId);
-      successMessage.value = 'Garantie supprimée avec succès !';
-      log('DEBUG_TIME: [WarrantyController] Garantie supprimée avec succès.');
-      Get.snackbar(
-        'Succès',
-        successMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-    } catch (e) {
-      errorMessage.value = 'Erreur lors de la suppression de la garantie: ${e.toString()}';
-      log('DEBUG_TIME: [WarrantyController] Erreur lors de la suppression de la garantie: $e');
-      Get.snackbar(
-        'Erreur',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      rethrow;
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  
-  Future<List<WarrantyModel>> getWarrantiesForProduct(String productId) async {
-    try {
-      log('DEBUG_TIME: [WarrantyController] Tentative de récupération des garanties pour le produit: $productId sur l\'ensemble des utilisateurs.');
-      List<WarrantyModel> productWarranties = [];
-
-      final allUsersWarrantiesSnapshot = await _databaseRef.child('warranties_by_user').once();
-      final usersData = allUsersWarrantiesSnapshot.snapshot.value;
-
-      if (usersData != null && usersData is Map<dynamic, dynamic>) {
-        usersData.forEach((userId, userWarrantiesMap) {
-          if (userWarrantiesMap is Map<dynamic, dynamic>) {
-            userWarrantiesMap.forEach((warrantyId, warrantyData) {
-              if (warrantyData is Map<dynamic, dynamic>) {
-                if (warrantyData['productId'] == productId) {
-                  final warranty = WarrantyModel.fromMap(Map<String, dynamic>.from(warrantyData), id: warrantyId);
-                  productWarranties.add(warranty);
-                }
+            futures.add(() async {
+              final warranty = WarrantyModel.fromMap(warrantyMap, id: warrantyId);
+              final product =
+                  await _productController.getProductById(warranty.productId);
+              if (product != null) {
+                warranty.product = product;
+                return warranty;
+              } else {
+                log('WARNING: Produit avec l\'ID ${warranty.productId} introuvable pour la garantie $warrantyId.');
+                return warranty;
               }
-            });
+            }());
           }
         });
-      }
 
-      log('DEBUG_TIME: [WarrantyController] ${productWarranties.length} garanties trouvées pour le produit $productId (recherche inter-utilisateurs).');
-      return productWarranties;
+        final fetchedWarranties = await Future.wait(futures);
+
+        final validWarranties =
+            fetchedWarranties.where((w) => w.product != null).toList();
+
+        _allWarranties.assignAll(validWarranties);
+        filterWarranties(searchTerm.value);
+      } else {
+        _allWarranties.clear();
+        filteredWarranties.clear();
+      }
     } catch (e) {
-      log('DEBUG_TIME: [WarrantyController] Erreur lors de la récupération des garanties pour le produit: $e.');
-      return [];
+      errorMessage.value =
+          'Erreur lors de la récupération des garanties: ${e.toString()}';
+      log('ERROR: Erreur dans fetchWarrantiesByUserId: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  // Ajout d'une méthode pour récupérer un ProductModel à partir de son ID
-  Future<ProductModel?> getProductDetails(String productId) async {
-    return _productController.getProductById(productId);
+  Future<WarrantyModel?> getWarrantyById(String warrantyId) async {
+    try {
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        log('Erreur: Utilisateur non authentifié.');
+        return null;
+      }
+
+      final DatabaseEvent event = await _databaseRef
+          .child('warranties_by_user')
+          .child(currentUser.uid)
+          .child(warrantyId)
+          .once();
+
+      final data = event.snapshot.value;
+
+      if (data != null && data is Map<dynamic, dynamic>) {
+        final warrantyMap = Map<String, dynamic>.from(data);
+        final warranty = WarrantyModel.fromMap(warrantyMap, id: warrantyId);
+        final product = await _productController.getProductById(warranty.productId);
+
+        if (product != null) {
+          warranty.product = product;
+          return warranty;
+        }
+      }
+      return null;
+    } catch (e) {
+      log('ERROR: Erreur lors de la récupération de la garantie: $e');
+      return null;
+    }
   }
 
-  // Ajout d'une méthode pour récupérer ProductCategoryModel à partir de son ID
-  Future<ProductCategoryModel?> getProductCategoryDetails(String categoryId) async {
-    return _productController.findProductCategoryById(categoryId);
+  Future<void> deleteWarranty(String warrantyId) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    successMessage.value = '';
+    try {
+      final warranty = _allWarranties.firstWhereOrNull((w) => w.id == warrantyId);
+      if (warranty == null) {
+        throw Exception("Garantie non trouvée.");
+      }
+
+      await _databaseRef
+          .child('warranties_by_user')
+          .child(userId.value)
+          .child(warrantyId)
+          .remove();
+
+      await _notificationController.deleteNotificationsByWarrantyId(warrantyId);
+
+      _allWarranties.removeWhere((w) => w.id == warrantyId);
+      filterWarranties(searchTerm.value);
+
+      successMessage.value = 'Garantie supprimée avec succès !';
+    } catch (e) {
+      errorMessage.value =
+          'Erreur lors de la suppression de la garantie: ${e.toString()}';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> requestWarrantyMigration(String warrantyId, String recipientEmail) async {
+    isLoading.value = true;
+    errorMessage.value = '';
+
+    try {
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      final currentUserEmail = FirebaseAuth.instance.currentUser?.email;
+      if (currentUserId == null || currentUserEmail == null) {
+        throw Exception("Utilisateur non authentifié.");
+      }
+
+      final recipientUserSnapshot = await _databaseRef
+          .child('users_by_email')
+          .child(recipientEmail.replaceAll('.', ',')) 
+          .once();
+
+      if (recipientUserSnapshot.snapshot.value == null) {
+        throw Exception("L'utilisateur avec cet email n'existe pas.");
+      }
+      final recipientUserId = recipientUserSnapshot.snapshot.value as String;
+
+      if (recipientUserId == currentUserId) {
+        throw Exception("Vous ne pouvez pas vous transférer une garantie à vous-même.");
+      }
+
+      final existingWarranty = _allWarranties.firstWhereOrNull((w) => w.id == warrantyId);
+      if (existingWarranty == null) {
+        throw Exception("Garantie non trouvée.");
+      }
+
+      // Créer une demande de migration
+      final migrationRef = _databaseRef
+          .child('pending_migrations')
+          .child(recipientUserId)
+          .child(warrantyId);
+      
+      await migrationRef.set({
+        'senderId': currentUserId,
+        'senderEmail': currentUserEmail, 
+        'warrantyId': warrantyId,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      successMessage.value = 'Demande de migration envoyée avec succès.';
+      Get.snackbar('Succès', 'Demande de migration envoyée à $recipientEmail.');
+
+    } catch (e) {
+      errorMessage.value = "Erreur: ${e.toString()}";
+      Get.snackbar('Erreur', 'Échec de l\'envoi de la demande: ${e.toString()}', snackPosition: SnackPosition.BOTTOM);
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

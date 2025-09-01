@@ -1,51 +1,83 @@
-import 'package:flutter/material.dart';
+import 'product_category_model.dart';
 
 class ProductModel {
   final String productId;
   final String productName;
   final double price;
   final String reference;
-  final String productCategoryId;
-  final String? productPhotoUrl; 
-  final String? manufacturingDate; 
-  final String? supplier; 
+  final String? productPhotoUrl;
+  final String? manufacturingDate;
+  final String supplier;
+  final ProductCategoryModel? productCategory;
 
   ProductModel({
     required this.productId,
     required this.productName,
     required this.price,
     required this.reference,
-    required this.productCategoryId,
+    this.manufacturingDate,
+    required this.supplier,
     this.productPhotoUrl,
-    this.manufacturingDate, 
-    this.supplier, 
+    this.productCategory,
   });
 
-  // Convertit un objet ProductModel en Map pour Firebase Realtime Database
   Map<String, dynamic> toJson() {
     return {
-      'productID': productId, 
+      'productID': productId,
       'productName': productName,
       'price': price,
       'reference': reference,
-      'productCategoryId': productCategoryId,
       'productPhotoUrl': productPhotoUrl,
-      'manufacturingDate': manufacturingDate, 
-      'supplier': supplier, 
+      'manufacturingDate': manufacturingDate,
+      'supplier': supplier,
+      'productCategory': productCategory?.toJson(),
     };
   }
 
-  // Crée un objet ProductModel à partir d'un Map de Firebase Realtime Database
   factory ProductModel.fromMap(Map<String, dynamic> map, {required String id}) {
+    ProductCategoryModel? productCategoryData;
+    if (map['productCategory'] != null && map['productCategory'] is Map) {
+      try {
+        productCategoryData = ProductCategoryModel.fromMap(
+          Map<String, dynamic>.from(map['productCategory']),
+          id: map['productCategory']['categoryId'] as String? ?? '',
+        );
+      } catch (e) {
+        print('Erreur lors de la désérialisation de la catégorie de produit: $e');
+      }
+    }
+
     return ProductModel(
-      productId: id, 
-      productName: map['productName'] ?? '',
+      productId: id,
+      productName: map['productName'] as String? ?? '',
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
-      reference: map['reference'] ?? '',
-      productCategoryId: map['productCategoryId'] ?? '',
-      productPhotoUrl: map['productPhotoUrl'],
-      manufacturingDate: map['manufacturingDate'], 
-      supplier: map['supplier'], 
+      reference: map['reference'] as String? ?? '',
+      productPhotoUrl: map['productPhotoUrl'] as String?,
+      manufacturingDate: map['manufacturingDate'] as String?,
+      supplier: map['supplier'] as String? ?? '',
+      productCategory: productCategoryData,
+    );
+  }
+
+  ProductModel copyWith({
+    String? productId,
+    String? productName,
+    double? price,
+    String? reference,
+    ProductCategoryModel? productCategory,
+    String? productPhotoUrl,
+    String? manufacturingDate,
+    String? supplier,
+  }) {
+    return ProductModel(
+      productId: productId ?? this.productId,
+      productName: productName ?? this.productName,
+      price: price ?? this.price,
+      reference: reference ?? this.reference,
+      productCategory: productCategory ?? this.productCategory,
+      productPhotoUrl: productPhotoUrl ?? this.productPhotoUrl,
+      manufacturingDate: manufacturingDate ?? this.manufacturingDate,
+      supplier: supplier ?? this.supplier,
     );
   }
 }

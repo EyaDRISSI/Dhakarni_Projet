@@ -1,67 +1,113 @@
-import 'package:flutter/foundation.dart';
+import 'product_model.dart';
 
 class WarrantyModel {
-  final String? id; 
-  final String userId;
-  final String productId;
-  final String warrantyType;
-  final String startDate;
-  final String endDate;
-  final String purchaseDate;
-  final String sellerName; 
-  final String? invoiceFilePath; 
-  final String? certificateFilePath;
-  final String? notes; 
-  final String createdAt; 
+  String? id;
+  String userId;
+  String productId;
+  String warrantyType;
+  DateTime? startDate;  
+  DateTime? endDate; 
+  DateTime? purchaseDate; 
+  String sellerName;
+  String? invoiceFilePath;
+  String? certificateFilePath;
+  String? notes;
+  DateTime? createdAt; 
+  ProductModel? product;
 
   WarrantyModel({
     this.id,
     required this.userId,
     required this.productId,
     required this.warrantyType,
-    required this.startDate,
-    required this.endDate,
-    required this.purchaseDate,
+    this.startDate,
+    this.endDate,
+    this.purchaseDate,
     required this.sellerName,
     this.invoiceFilePath,
     this.certificateFilePath,
     this.notes,
-    required this.createdAt,
+    this.createdAt,
+    this.product,
   });
 
- 
   factory WarrantyModel.fromMap(Map<String, dynamic> data, {String? id}) {
+    ProductModel? productData;
+    final productMap = data['product'];
+    if (productMap != null && productMap is Map) {
+      try {
+        productData = ProductModel.fromMap(
+          Map<String, dynamic>.from(productMap),
+          id: data['productId'] as String? ?? '',
+        );
+      } catch (e) {
+        print('Erreur lors de la désérialisation du produit: $e');
+      }
+    }
+
     return WarrantyModel(
-      id: id ?? data['warrantyID'], // Utilisez l'ID passé ou celui dans la Map
-      userId: data['addedBy'] ?? '', // Assurez-vous que 'addedBy' correspond à l'userId
-      productId: data['product']['productID'] ?? '', // Accédez à l'ID du produit imbriqué
-      warrantyType: data['warrantyType'] ?? '',
-      startDate: data['warrantyStartDate'] ?? '',
-      endDate: data['warrantyEndDate'] ?? '',
-      purchaseDate: data['purchaseDate'] ?? '',
-      sellerName: data['sellerName'] ?? '',
-      invoiceFilePath: data['copyOfBill'],
-      certificateFilePath: data['copyOfWarrantyCertif'],
-      notes: data['note'],
-      createdAt: data['timestamp'] != null ? DateTime.fromMillisecondsSinceEpoch(data['timestamp'] is int ? data['timestamp'] : int.parse(data['timestamp'].toString())).toIso8601String() : DateTime.now().toIso8601String(), 
+      id: id,
+      userId: data['userId'] as String? ?? '',
+      productId: data['productId'] as String? ?? '',
+      warrantyType: data['warrantyType'] as String? ?? '',
+      startDate: data['warrantyStartDate'] != null ? DateTime.fromMillisecondsSinceEpoch(data['warrantyStartDate'] as int) : null,
+  endDate: data['warrantyEndDate'] != null ? DateTime.fromMillisecondsSinceEpoch(data['warrantyEndDate'] as int) : null,
+  purchaseDate: data['purchaseDate'] != null ? DateTime.fromMillisecondsSinceEpoch(data['purchaseDate'] as int) : null,
+      sellerName: data['sellerName'] as String? ?? '',
+      invoiceFilePath: data['invoiceFilePath'] as String?,
+      certificateFilePath: data['certificateFilePath'] as String?,
+      notes: data['notes'] as String?,
+      createdAt: data['createdAt'] != null ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'] as int) : null,
+      product: productData,
     );
   }
 
- 
   Map<String, dynamic> toJson() {
     return {
-      'warrantyID': id,
-      'addedBy': userId,
-      'productId': productId, 
+      'userId': userId,
+      'productId': productId,
       'warrantyType': warrantyType,
-      'warrantyStartDate': startDate,
-      'warrantyEndDate': endDate,
-      'purchaseDate': purchaseDate,
+      'warrantyStartDate': startDate?.millisecondsSinceEpoch,
+      'warrantyEndDate': endDate?.millisecondsSinceEpoch,
+      'purchaseDate': purchaseDate?.millisecondsSinceEpoch,
       'sellerName': sellerName,
-      'copyOfBill': invoiceFilePath,
-      'copyOfWarrantyCertif': certificateFilePath,
-      'note': notes,
-      'timestamp': DateTime.parse(createdAt).millisecondsSinceEpoch, 
+      'invoiceFilePath': invoiceFilePath,
+      'certificateFilePath': certificateFilePath,
+      'notes': notes,
+      'createdAt': createdAt?.millisecondsSinceEpoch,
+      'product': product?.toJson(),
     };
+  }
+
+  WarrantyModel copyWith({
+    String? id,
+    String? userId,
+    String? productId,
+    String? warrantyType,
+    DateTime? startDate,
+    DateTime? endDate,
+    DateTime? purchaseDate,
+    String? sellerName,
+    String? invoiceFilePath,
+    String? certificateFilePath,
+    String? notes,
+    DateTime? createdAt,
+    ProductModel? product,
+  }) {
+    return WarrantyModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      productId: productId ?? this.productId,
+      warrantyType: warrantyType ?? this.warrantyType,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      purchaseDate: purchaseDate ?? this.purchaseDate,
+      sellerName: sellerName ?? this.sellerName,
+      invoiceFilePath: invoiceFilePath ?? this.invoiceFilePath,
+      certificateFilePath: certificateFilePath ?? this.certificateFilePath,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      product: product ?? this.product,
+    );
   }
 }

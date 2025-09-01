@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../auth/login.dart'; 
+import '../auth/login.dart'; 
 
 
 
@@ -9,6 +9,7 @@ class SingleSplashPage extends StatefulWidget {
   @override
   State<SingleSplashPage> createState() => _SingleSplashPageState();
 }
+
 
 class _SingleSplashPageState extends State<SingleSplashPage>
     with SingleTickerProviderStateMixin {
@@ -210,7 +211,7 @@ class _SingleSplashPageState extends State<SingleSplashPage>
               child: FadeTransition(
                 opacity: _animation, 
                 child: Container(
-                  height: screenHeight * 0.55,
+                  height: screenHeight * 0.50,
                   width: screenWidth, 
                   decoration: backgroundImagePath != null
                       ? BoxDecoration(

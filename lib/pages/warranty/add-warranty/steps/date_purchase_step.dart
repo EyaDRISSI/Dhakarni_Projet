@@ -1,88 +1,6 @@
-// date_purchase_step.dart
-
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:intl/intl.dart'; 
-
-
-class CustomTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String labelText;
-  final String hintText;
-  final bool obscureText;
-  final TextInputType keyboardType;
-  final FormFieldValidator<String>? validator;
-  final Widget? suffixIcon;
-  final VoidCallback? onTap;
-  final bool readOnly;
-  final int? maxLines;
-
-  const CustomTextField({
-    super.key,
-    required this.controller,
-    required this.labelText,
-    this.hintText = '',
-    this.obscureText = false,
-    this.keyboardType = TextInputType.text,
-    this.validator,
-    this.suffixIcon,
-    this.onTap,
-    this.readOnly = false,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          labelText,
-          style: const TextStyle(
-              fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          readOnly: readOnly,
-          onTap: onTap,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE91E63)),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
-            suffixIcon: suffixIcon,
-          ),
-          validator: validator,
-        ),
-      ],
-    );
-  }
-}
-
+import 'package:intl/intl.dart';
+import '../add-w-widgets/custom_text_field.dart';
 
 class DatePurchaseStep extends StatelessWidget {
   final GlobalKey<FormState> formKey;
@@ -90,7 +8,7 @@ class DatePurchaseStep extends StatelessWidget {
   final TextEditingController endDateController;
   final TextEditingController purchaseDateController;
   final TextEditingController sellerNameController;
-  final Function(TextEditingController) onSelectDate; 
+  final Function(TextEditingController) onSelectDate;
 
   const DatePurchaseStep({
     super.key,
@@ -109,12 +27,26 @@ class DatePurchaseStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 10),
+           const SizedBox(height: 20),
+          const Text(
+            'Dates et Achats',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFFE91E63),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Indiquez les dates pertinentes et les détails d achat de votre produit.',
+            style: TextStyle(fontSize: 16, color: Colors.black87),
+          ),
+          const SizedBox(height: 20),
           CustomTextField(
             controller: startDateController,
             labelText: 'Date de début de garantie',
             hintText: 'JJ/MM/AAAA',
-            readOnly: true, 
+            readOnly: true,
             onTap: () => onSelectDate(startDateController),
             suffixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
             validator: (value) {
@@ -130,15 +62,16 @@ class DatePurchaseStep extends StatelessWidget {
             labelText: 'Date de fin de garantie',
             hintText: 'JJ/MM/AAAA',
             readOnly: true,
-            onTap: () => onSelectDate(endDateController), 
+            onTap: () => onSelectDate(endDateController),
             suffixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Veuillez sélectionner la date de fin de garantie';
               }
               try {
-                final start = DateFormat('yyyy-MM-dd').parse(startDateController.text);
-                final end = DateFormat('yyyy-MM-dd').parse(value);
+                final dateFormat = DateFormat('dd/MM/yyyy'); 
+                final start = dateFormat.parse(startDateController.text);
+                final end = dateFormat.parse(value);
                 if (end.isBefore(start)) {
                   return 'La date de fin ne peut pas être antérieure à la date de début';
                 }
@@ -154,7 +87,7 @@ class DatePurchaseStep extends StatelessWidget {
             labelText: 'Date d\'achat',
             hintText: 'JJ/MM/AAAA',
             readOnly: true,
-            onTap: () => onSelectDate(purchaseDateController), 
+            onTap: () => onSelectDate(purchaseDateController),
             suffixIcon: const Icon(Icons.calendar_today, color: Colors.grey),
             validator: (value) {
               if (value == null || value.isEmpty) {

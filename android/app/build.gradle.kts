@@ -6,38 +6,39 @@ plugins {
     // END: FlutterFire Configuration
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
-    id("dev.flutter.flutter-gradle-plugin") 
+    id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.example.dhakarni_1"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973" 
+    compileSdk = 35 
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17 // Ou JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_17 // Ou JavaVersion.VERSION_11
+        // Correct syntax for Kotlin DSL
+        isCoreLibraryDesugaringEnabled = true // Corrected line
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString() // Ou JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
-    // Ces blocs DOIVENT être à l'intérieur du bloc 'android { ... }'
     defaultConfig {
         applicationId = "com.example.dhakarni_1"
-        minSdk = 23 // Ceci est correct
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" 
+        minSdk = 23
+        targetSdk = 35 
+        versionCode = flutter.versionCode as Int?
+        versionName = flutter.versionName as String?
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-             signingConfig = signingConfigs.getByName("debug") 
-            isMinifyEnabled = true // Active la minification du code
-            isShrinkResources = true // Active la suppression des ressources inutilisées
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 }
@@ -50,7 +51,9 @@ dependencies {
     // Import the Firebase BoM
     implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
     implementation("com.google.firebase:firebase-database-ktx")
-    implementation("com.google.firebase:firebase-auth") // Exemple: pour Firebase Auth
-    implementation("com.google.firebase:firebase-firestore") // Exemple: pour Cloud Firestore
-    
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+
+    // Update the desugaring library version from 2.0.4 to 2.1.4
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

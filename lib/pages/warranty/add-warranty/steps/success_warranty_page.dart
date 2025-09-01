@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../warranty-home.dart'; 
+import '../../warranty-home/warranty-home.dart';
+import '../../../../models/warranty_model.dart';
+import '../../../Notification/notificationSetup/notification_setup_page.dart';
 
 class SuccessWarrantyPage extends StatelessWidget {
-  const SuccessWarrantyPage({Key? key}) : super(key: key);
+  final WarrantyModel? newWarranty;
+
+  const SuccessWarrantyPage({Key? key, this.newWarranty}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -20,13 +24,15 @@ class SuccessWarrantyPage extends StatelessWidget {
                 height: 150,
               ),
               const SizedBox(height: 30),
-              const Text(
-                'Garantie Ajoutée avec Succès !',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFE91E63),
+              FittedBox(
+                child: const Text(
+                  'Garantie Ajoutée avec Succès !',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color.fromARGB(255, 77, 77, 77),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -35,12 +41,26 @@ class SuccessWarrantyPage extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.grey[700]),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 50),
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
                   onPressed: () {
+                    if (newWarranty != null) {
+                      Get.off(() => NotificationSetupPage(warranty: newWarranty!));
+                    } else {
+                      Get.snackbar(
+                        "Erreur",
+                        "La garantie est manquante. Redirection vers la page d'accueil.",
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.red,
+                        colorText: Colors.white,
+                      );
+                      Future.delayed(const Duration(milliseconds: 1500), () {
+                        Get.offAll(() => const WarrantyHomePage());
+                      });
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE91E63),
@@ -52,7 +72,6 @@ class SuccessWarrantyPage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),

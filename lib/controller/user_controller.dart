@@ -2,54 +2,50 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:get/get.dart';
 import '../models/user_model.dart';
-import 'dart:developer'; 
+import 'dart:developer';
 
-/// `UserController` gère l'état de l'utilisateur et les interactions avec Firebase Authentication
-/// et Firebase Realtime Database.
 class UserController extends GetxController {
- 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
 
   Rx<UserModel?> currentUser = Rx<UserModel?>(null);
+  RxDouble profileCompletionPercentage = 0.0.obs;
 
   @override
   void onInit() {
     super.onInit();
     log('DEBUG_TIME: [UserController] Initialisation du contrôleur utilisateur.');
 
-    
     _auth.authStateChanges().listen((User? user) async {
       if (user != null) {
-        // L'utilisateur est connecté.
         log('DEBUG_TIME: [UserController] État d\'authentification changé - Utilisateur connecté (UID: ${user.uid}).');
-        // Récupère les détails complets de l'utilisateur depuis la base de données.
         await fetchCurrentUserDetails(user.uid);
+        calculateProfileCompletion(); 
         log('DEBUG_TIME: [UserController] Détails utilisateur récupérés et `currentUser` mis à jour.');
       } else {
-        // L'utilisateur est déconnecté.
-        currentUser.value = null; // Réinitialise l'utilisateur actuel à nul.
+        currentUser.value = null;
+        profileCompletionPercentage.value = 0.0; 
         log('DEBUG_TIME: [UserController] Utilisateur déconnecté.');
       }
     });
+
+    ever(currentUser, (_) {
+      calculateProfileCompletion();
+    });
   }
 
-  /// Sauvegarde les données d'un utilisateur dans Firebase Realtime Database.
-  /// Prend un `UserModel` en paramètre et le stocke sous l'ID de l'utilisateur.
   Future<void> saveUserData(UserModel user) async {
     try {
       log('DEBUG_TIME: [UserController] Début de la sauvegarde des données utilisateur pour UID: ${user.userId}.');
       await _databaseRef.child('users').child(user.userId).set(user.toMap());
-      currentUser.value = user; 
+      currentUser.value = user;
       log('DEBUG_TIME: [UserController] Données utilisateur sauvegardées avec succès pour UID: ${user.userId}.');
     } catch (e) {
       log('DEBUG_TIME: [UserController] Erreur lors de la sauvegarde des données utilisateur: $e.');
-      rethrow; 
+      rethrow;
     }
   }
 
-  /// Récupère les détails d'un utilisateur spécifique depuis Firebase Realtime Database.
-  /// Prend l'ID de l'utilisateur (`uid`) comme paramètre.
   Future<void> fetchCurrentUserDetails(String uid) async {
     try {
       log('DEBUG_TIME: [UserController] Début de la récupération des détails utilisateur pour UID: $uid.');
@@ -61,9 +57,8 @@ class UserController extends GetxController {
         currentUser.value = UserModel.fromMap(userData);
         log('DEBUG_TIME: [UserController] Données utilisateur récupérées avec succès pour ${currentUser.value?.email}.');
       } else {
-        
         log('DEBUG_TIME: [UserController] Aucune donnée utilisateur trouvée pour UID: $uid.');
-        currentUser.value = null; 
+        currentUser.value = null;
       }
     } catch (e) {
       log('DEBUG_TIME: [UserController] Erreur lors de la récupération des données utilisateur: $e.');
@@ -71,7 +66,6 @@ class UserController extends GetxController {
     }
   }
 
-  /// Tente de connecter un utilisateur avec son email et mot de passe.
   Future<void> signIn(String email, String password) async {
     try {
       log('DEBUG_TIME: [UserController] Tentative de connexion pour l\'email: $email.');
@@ -80,7 +74,6 @@ class UserController extends GetxController {
         password: password,
       );
       log('DEBUG_TIME: [UserController] Connexion Firebase Auth réussie pour $email.');
-      
     } on FirebaseAuthException catch (e) {
       log('DEBUG_TIME: [UserController] Erreur de connexion Firebase Auth pour $email: ${e.code} - ${e.message}.');
       String errorMessage;
@@ -98,11 +91,32 @@ class UserController extends GetxController {
     } catch (e) {
       log('DEBUG_TIME: [UserController] Erreur inattendue lors de la connexion: $e.');
       Get.snackbar("Erreur", "Une erreur inattendue est survenue : $e", snackPosition: SnackPosition.BOTTOM);
-      rethrow; 
+      rethrow;
     }
   }
 
-  /// Enregistre un nouvel utilisateur avec son email, mot de passe, prénom et nom.
+  void calculateProfileCompletion() {
+    if (currentUser.value == null) {
+      profileCompletionPercentage.value = 0.0;
+      return;
+    }
+
+    int completedFields = 0;
+    int totalFields = 7; 
+
+    if (currentUser.value!.prenom != null && currentUser.value!.prenom.isNotEmpty) completedFields++;
+    if (currentUser.value!.nom != null && currentUser.value!.nom.isNotEmpty) completedFields++;
+    if (currentUser.value!.status != null && currentUser.value!.status!.isNotEmpty) completedFields++;
+    if (currentUser.value!.address != null && currentUser.value!.address!.isNotEmpty) completedFields++;
+    if (currentUser.value!.mobileNumber != null && currentUser.value!.mobileNumber!.isNotEmpty) completedFields++;
+    if (currentUser.value!.birthDate != null && currentUser.value!.birthDate!.isNotEmpty) completedFields++;
+    if (currentUser.value!.website != null && currentUser.value!.website!.isNotEmpty) completedFields++;
+
+
+    profileCompletionPercentage.value = (completedFields / totalFields) * 100;
+    log('DEBUG_TIME: [UserController] Profile completion: ${profileCompletionPercentage.value.toInt()}% for ${currentUser.value?.email ?? 'unknown'}');
+  }
+
   Future<void> signUp(String email, String password, String prenom, String nom) async {
     try {
       log('DEBUG_TIME: [UserController] Tentative d\'inscription pour l\'email: $email.');
@@ -112,23 +126,22 @@ class UserController extends GetxController {
       );
 
       if (userCredential.user != null) {
-        // Crée un nouveau modèle d'utilisateur avec les informations fournies.
         UserModel newUser = UserModel(
           userId: userCredential.user!.uid,
           email: userCredential.user!.email!,
           prenom: prenom,
           nom: nom,
-          registrationDate: DateTime.now().toIso8601String(), 
+          registrationDate: DateTime.now().toIso8601String(),
         );
 
         log('DEBUG_TIME: [UserController] Utilisateur Firebase Auth créé. Sauvegarde des données utilisateur...');
-        await saveUserData(newUser); // Sauvegarde les données du nouvel utilisateur dans la Realtime Database.
+        await saveUserData(newUser);
 
         currentUser.value = newUser;
         log('DEBUG_TIME: [UserController] Processus d\'inscription terminé. `currentUser` mis à jour.');
 
         Get.snackbar("Succès", "Compte créé avec succès !");
-          }
+      }
     } on FirebaseAuthException catch (e) {
       log('DEBUG_TIME: [UserController] Erreur Firebase Auth lors de l\'inscription: ${e.code} - ${e.message}.');
       String errorMessage;
@@ -140,11 +153,11 @@ class UserController extends GetxController {
         errorMessage = 'Erreur d\'authentification : ${e.message}';
       }
       Get.snackbar("Erreur d'inscription", errorMessage, snackPosition: SnackPosition.BOTTOM);
-      rethrow; 
+      rethrow;
     } catch (e) {
       log('DEBUG_TIME: [UserController] Erreur inattendue lors de l\'inscription: $e.');
       Get.snackbar("Erreur", "Une erreur inattendue est survenue : $e", snackPosition: SnackPosition.BOTTOM);
-      rethrow; 
+      rethrow;
     }
   }
 }

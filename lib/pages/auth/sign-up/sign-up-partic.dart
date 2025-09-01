@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
-import '../../controller/user_controller.dart';
-import '../../models/user_model.dart';
+import '../../../controller/user_controller.dart';
+import '../../../models/user_model.dart';
 import './verif-mail.dart';
 
 
@@ -94,8 +93,7 @@ class _SignUpParticulierPageState extends State<SignUpParticulierPage> {
         return 0;
       case SignUpStep.securitySetup:
         return 1;
-      default:
-        return 0;
+     
     }
   }
 
@@ -171,8 +169,7 @@ class _SignUpParticulierPageState extends State<SignUpParticulierPage> {
         return _buildNameInputForm();
       case SignUpStep.securitySetup:
         return _buildSecuritySetupForm();
-      default:
-        return const SizedBox.shrink();
+      
     }
   }
 

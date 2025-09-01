@@ -4,129 +4,20 @@ import 'package:get/get.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:intl/intl.dart'; 
-
-import 'package:firebase_database/firebase_database.dart';
+import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart'; 
+import 'dart:developer';
 
-import 'product_info_step.dart';
-import '../add-warranty/date_purchase_step.dart';
-import '../add-warranty/documents_notes_step.dart';
-import '../add-warranty/success_warranty_page.dart';
-import '../../warranty/warranty-home.dart';
+import 'steps/product_info_step.dart';
+import 'steps/date_purchase_step.dart';
+import 'steps/documents_notes_step.dart';
+import '../warranty-home/warranty-home.dart';
+import './add-w-widgets/step_progress_indicator.dart';
+import 'steps/success_warranty_page.dart';
 
-class StepProgressIndicator extends StatelessWidget {
-  final int currentStep;
-  final int totalSteps;
-
-  const StepProgressIndicator({
-    super.key,
-    required this.currentStep,
-    required this.totalSteps,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(totalSteps, (index) {
-          bool isActive = index <= currentStep;
-          return Expanded(
-            child: Container(
-              height: 4,
-              margin: EdgeInsets.only(right: index == totalSteps - 1 ? 0 : 8),
-              decoration: BoxDecoration(
-                color: isActive ? const Color(0xFFE91E63) : Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class CustomTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String labelText;
-  final String hintText;
-  final bool obscureText;
-  final TextInputType keyboardType;
-  final FormFieldValidator<String>? validator;
-  final Widget? suffixIcon;
-  final VoidCallback? onTap;
-  final bool readOnly;
-  final int? maxLines;
-
-  const CustomTextField({
-    super.key,
-    required this.controller,
-    required this.labelText,
-    this.hintText = '',
-    this.obscureText = false,
-    this.keyboardType = TextInputType.text,
-    this.validator,
-    this.suffixIcon,
-    this.onTap,
-    this.readOnly = false,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          labelText,
-          style: const TextStyle(
-              fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          readOnly: readOnly,
-          onTap: onTap,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE91E63)),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
-            suffixIcon: suffixIcon,
-          ),
-          validator: validator,
-        ),
-      ],
-    );
-  }
-}
+import '../../../controller/product_controller.dart';
+import '../../../controller/warranty_controller.dart';
+import '../../../models/product_category_model.dart';
 
 class AddWarrantyPage extends StatefulWidget {
   const AddWarrantyPage({super.key});
@@ -136,8 +27,13 @@ class AddWarrantyPage extends StatefulWidget {
 }
 
 class _AddWarrantyPageState extends State<AddWarrantyPage> {
+  final ProductController _productController = Get.find<ProductController>();
+  final WarrantyController _warrantyController = Get.find<WarrantyController>();
+
   int _currentStep = 0;
   final PageController _pageController = PageController();
+
+  bool _isLoading = false;
 
   final _productInfoFormKey = GlobalKey<FormState>();
   final _datePurchaseFormKey = GlobalKey<FormState>();
@@ -145,10 +41,13 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
 
   final TextEditingController _productNameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
-  final TextEditingController _manufactureDateController = TextEditingController();
+  final TextEditingController _manufactureDateController =
+      TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
   final TextEditingController _supplierController = TextEditingController();
-  String? _selectedCategory;
+
+  String? _selectedCategoryId;
+  String? _selectedCategoryName;
   String? _selectedSubCategory;
   String? _selectedWarrantyType;
   File? _productPhoto;
@@ -161,71 +60,6 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
   File? _invoiceFile;
   File? _certificateFile;
   final TextEditingController _notesController = TextEditingController();
-
-  final Map<String, List<String>> categories = {
-    'Informatique': [
-      'Ordinateurs portables',
-      'Ordinateurs de bureau',
-      'Imprimantes & scanners',
-      'Disques durs & SSD',
-      'Écrans',
-      'Claviers & souris',
-      'Réseaux & routeurs',
-      'Logiciels'
-    ],
-    ' Électroménager': [
-      'Réfrigérateurs',
-      'Lave-linge',
-      'Fours & micro-ondes',
-      'Cuisinières',
-      'Aspirateurs',
-      'Robots de cuisine',
-      'Chauffe-eau',
-      'Climatiseurs'
-    ],
-    ' TV, Photo et Son': [
-      'Téléviseurs LED/OLED',
-      'Home cinéma',
-      'Appareils photo numériques',
-      'Caméras de surveillance',
-      'Vidéoprojecteurs',
-      'Enceintes Bluetooth',
-      'Casques audio'
-    ],
-    ' Téléphonie': [
-      'Smartphones',
-      'Téléphones fixes',
-      'Tablettes',
-      'Accessoires de téléphone',
-      'Cartes SIM & recharge',
-      'Écouteurs Bluetooth'
-    ],
-    ' Accessoires': [
-      'Coques & housses',
-      'Chargeurs & câbles',
-      'Supports téléphones / PC',
-      'Batteries externes',
-      'Clés USB',
-      'Accessoires gaming',
-      'Adaptateurs'
-    ],
-    ' Véhicules': [
-      'Voitures',
-      'Motos & scooters',
-      'Vélos',
-      'Pièces détachées auto/moto',
-      'Accessoires auto (GPS, tapis, caméras)',
-      'Pneus & jantes'
-    ],
-    ' Énergie et Solaire': [
-      'Panneaux solaires',
-      'Batteries solaires',
-      'Régulateurs de charge',
-      'Onduleurs',
-      'Lampes solaires',
-      'Kits solaires portables'
-    ],
-  };
 
   final List<String> warrantyTypes = [
     'Garantie du Fabricant',
@@ -246,7 +80,7 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
     _priceController.dispose();
     _manufactureDateController.dispose();
     _referenceController.dispose();
-    _supplierController.dispose(); 
+    _supplierController.dispose();
     _startDateController.dispose();
     _endDateController.dispose();
     _purchaseDateController.dispose();
@@ -256,162 +90,153 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
     super.dispose();
   }
 
-  Future<String?> _uploadFile(File? file, String path) async {
-    if (file == null) return null;
-    try {
-      final ref = FirebaseStorage.instance.ref().child(path).child(file.path.split('/').last);
-      final uploadTask = ref.putFile(file);
-      final snapshot = await uploadTask.whenComplete(() => {});
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      print('Erreur lors de l\'upload du fichier $path: $e');
-      return null;
-    }
+  void _showValidationSnackbar(String title, String message) {
+    Get.snackbar(
+      title,
+      message,
+      backgroundColor: Colors.orange.withOpacity(0.7),
+      colorText: Colors.white,
+    );
   }
 
-  Future<void> _saveWarrantyToFirebase() async {
+  void _saveWarranty() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      Get.snackbar(
-        'Erreur d\'authentification',
-        'Veuillez vous connecter pour ajouter une garantie.',
-        backgroundColor: Colors.red.withOpacity(0.7),
-        colorText: Colors.white,
-      );
+      _showValidationSnackbar('Erreur d\'authentification',
+          'Veuillez vous connecter pour ajouter une garantie.');
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    if (_productNameController.text.isEmpty ||
+        _selectedCategoryId == null ||
+        _selectedCategoryName == null ||
+        _selectedSubCategory == null ||
+        _priceController.text.isEmpty ||
+        _referenceController.text.isEmpty ||
+        _supplierController.text.isEmpty ||
+        _selectedWarrantyType == null ||
+        _startDateController.text.isEmpty ||
+        _endDateController.text.isEmpty ||
+        _purchaseDateController.text.isEmpty ||
+        _sellerNameController.text.isEmpty) {
+      _showValidationSnackbar('Données manquantes',
+          'Veuillez remplir toutes les informations requises.');
+      setState(() {
+        _isLoading = false;
+      });
       return;
     }
 
     try {
-      Get.dialog(
-        const Center(child: CircularProgressIndicator(color: Color(0xFFE91E63))),
-        barrierDismissible: false,
-      ); 
+      final dateFormat = DateFormat('dd/MM/yyyy');
+      final DateTime purchaseDate =
+          dateFormat.parse(_purchaseDateController.text);
+      final DateTime startDate = dateFormat.parse(_startDateController.text);
+      final DateTime endDate = dateFormat.parse(_endDateController.text);
+      final String manufactureDate = _manufactureDateController.text;
 
-      final String userId = user.uid;
-      final databaseRef = FirebaseDatabase.instance.ref();
-
-      // Upload des fichiers vers Firebase Storage
-      final productPhotoUrl = await _uploadFile(_productPhoto, 'warranty_photos/$userId/products');
-      final invoiceFileUrl = await _uploadFile(_invoiceFile, 'warranty_documents/$userId/invoices');
-      final certificateFileUrl = await _uploadFile(_certificateFile, 'warranty_documents/$userId/certificates');
-
-      final newWarrantyId = databaseRef.child('warranties_by_user').child(userId).push().key;
-      if (newWarrantyId == null) {
-        throw Exception('Impossible de générer un ID de garantie unique.');
-      }
-
-      final DateFormat formatter = DateFormat('yyyy-MM-dd');
-      String? manufactureDateFormatted;
-      if (_manufactureDateController.text.isNotEmpty) {
-        try {
-          manufactureDateFormatted = formatter.format(DateTime.parse(_manufactureDateController.text));
-        } catch (e) {
-          print("Erreur de formatage de la date de fabrication: $e");
-        }
-      }
-      String? startDateFormatted;
-      if (_startDateController.text.isNotEmpty) {
-        try {
-          startDateFormatted = formatter.format(DateTime.parse(_startDateController.text));
-        } catch (e) {
-          print("Erreur de formatage de la date de début de garantie: $e");
-        }
-      }
-      String? endDateFormatted;
-      if (_endDateController.text.isNotEmpty) {
-        try {
-          endDateFormatted = formatter.format(DateTime.parse(_endDateController.text));
-        } catch (e) {
-          print("Erreur de formatage de la date de fin de garantie: $e");
-        }
-      }
-      String? purchaseDateFormatted;
-      if (_purchaseDateController.text.isNotEmpty) {
-        try {
-          purchaseDateFormatted = formatter.format(DateTime.parse(_purchaseDateController.text));
-        } catch (e) {
-          print("Erreur de formatage de la date d'achat: $e");
-        }
-      }
-
-
-      final productData = {
-        'productID': newWarrantyId, 
-        'productName': _productNameController.text,
-        'productCategory': _selectedCategory,
-        'productSubCategory': _selectedSubCategory, 
-        'price': double.tryParse(_priceController.text) ?? 0.0,
-        'reference': _referenceController.text,
-        'manufacturingDate': manufactureDateFormatted,
-        'supplier': _supplierController.text,
-        'productPhotoUrl': productPhotoUrl, 
-      };
-
-      final warrantyData = {
-        'warrantyID': newWarrantyId,
-        'product': productData, 
-        'warrantyStartDate': startDateFormatted,
-        'warrantyEndDate': endDateFormatted,
-        'warrantyType': _selectedWarrantyType,
-        'purchaseDate': purchaseDateFormatted,
-        'sellerName': _sellerNameController.text,
-        'invoiceUrl': invoiceFileUrl, 
-        'certificateUrl': certificateFileUrl, 
-        'notes': _notesController.text,
-        'addedBy': userId, 
-        'timestamp': ServerValue.timestamp, 
-      };
-
-      await databaseRef.child('warranties_by_user').child(userId).child(newWarrantyId).set(warrantyData);
-
-      
-
-      Get.back();
-      Get.to(() => const SuccessWarrantyPage());
-
-    } catch (e) {
-      Get.back(); 
-      print('Erreur lors de l\'enregistrement de la garantie : $e');
-      Get.snackbar(
-        'Erreur',
-        'Échec de l\'enregistrement de la garantie: $e',
-        backgroundColor: Colors.red.withOpacity(0.7),
-        colorText: Colors.white,
+      await _warrantyController.addWarranty(
+        userId: user.uid,
+        productName: _productNameController.text,
+        price: double.tryParse(_priceController.text) ?? 0.0,
+        manufactureDate: manufactureDate,
+        reference: _referenceController.text,
+        productCategoryId: _selectedCategoryId!,
+        productCategoryName: _selectedCategoryName!,
+        productSubCategoryName: _selectedSubCategory!,
+        supplier: _supplierController.text,
+        warrantyType: _selectedWarrantyType!,
+        productPhotoFile: _productPhoto,
+        startDate: startDate,
+        endDate: endDate,
+        purchaseDate: purchaseDate,
+        sellerName: _sellerNameController.text,
+        invoiceFile: _invoiceFile,
+        certificateFile: _certificateFile,
+        notes: _notesController.text.isNotEmpty ? _notesController.text : null,
       );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (_warrantyController.allWarranties.isNotEmpty) {
+        final newWarranty = _warrantyController.allWarranties.last;
+        Get.off(() => SuccessWarrantyPage(newWarranty: newWarranty));
+      } else {
+        Get.offAll(() => const WarrantyHomePage());
+      }
+    } catch (e) {
+      log('Erreur détaillée: $e');
+      _showValidationSnackbar('Erreur',
+          'Échec de l\'ajout de la garantie. Veuillez réessayer. Erreur: ${e.toString()}');
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
-
 
   void _nextStep() {
     bool isValid = false;
     if (_currentStep == 0) {
       isValid = _productInfoFormKey.currentState?.validate() ?? false;
+      if (isValid && (_selectedCategoryId == null || _selectedCategoryName == null)) {
+        isValid = false;
+        _showValidationSnackbar(
+            'Validation manquante', 'Veuillez sélectionner une catégorie de produit.');
+      }
       if (isValid && (_selectedSubCategory == null || _selectedSubCategory!.isEmpty)) {
         isValid = false;
-        Get.snackbar(
-          'Validation manquante',
-          'Veuillez sélectionner une catégorie de produit.',
-          backgroundColor: Colors.orange.withOpacity(0.7),
-          colorText: Colors.white,
-        );
+        _showValidationSnackbar('Validation manquante',
+            'Veuillez sélectionner une sous-catégorie de produit.');
       }
-      if (isValid && (_selectedWarrantyType == null || _selectedWarrantyType!.isEmpty)) {
+      if (isValid &&
+          (_selectedWarrantyType == null || _selectedWarrantyType!.isEmpty)) {
         isValid = false;
-        Get.snackbar(
-          'Validation manquante',
-          'Veuillez sélectionner un type de garantie.',
-          backgroundColor: Colors.orange.withOpacity(0.7),
-          colorText: Colors.white,
-        );
+        _showValidationSnackbar(
+            'Validation manquante', 'Veuillez sélectionner un type de garantie.');
       }
-    
-
-
     } else if (_currentStep == 1) {
       isValid = _datePurchaseFormKey.currentState?.validate() ?? false;
+      if (isValid) {
+        final dateFormat = DateFormat('dd/MM/yyyy');
+        final DateTime? manufactureDate =
+            _manufactureDateController.text.isNotEmpty
+                ? dateFormat.parse(_manufactureDateController.text)
+                : null;
+        final DateTime? purchaseDate = _purchaseDateController.text.isNotEmpty
+            ? dateFormat.parse(_purchaseDateController.text)
+            : null;
+
+        if (manufactureDate != null &&
+            purchaseDate != null &&
+            manufactureDate.isAfter(purchaseDate)) {
+          isValid = false;
+          _showValidationSnackbar('Erreur de date',
+              'La date de fabrication ne peut pas être postérieure à la date d\'achat.');
+        }
+        final DateTime? startDate = _startDateController.text.isNotEmpty
+            ? dateFormat.parse(_startDateController.text)
+            : null;
+        final DateTime? endDate = _endDateController.text.isNotEmpty
+            ? dateFormat.parse(_endDateController.text)
+            : null;
+
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+          isValid = false;
+          _showValidationSnackbar('Erreur de date',
+              'La date de début de garantie ne peut pas être postérieure à la date de fin.');
+        }
+      }
     } else if (_currentStep == 2) {
-      isValid = _documentsNotesFormKey.currentState?.validate() ?? false;
+      isValid = true;
     }
 
     if (isValid) {
@@ -424,8 +249,9 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
           curve: Curves.easeIn,
         );
       } else {
-        
-        _saveWarrantyToFirebase();
+        if (!_isLoading) {
+          _saveWarranty();
+        }
       }
     }
   }
@@ -440,13 +266,36 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
         curve: Curves.easeIn,
       );
     } else {
-      Get.back();
+      _showExitConfirmationDialog();
     }
+  }
+
+  void _showExitConfirmationDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Abandonner le formulaire ?'),
+        content: const Text(
+            'Êtes-vous sûr de vouloir quitter ? Toutes les informations saisies seront perdues.'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Annuler', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.offAll(() => const WarrantyHomePage());
+            },
+            child:
+                const Text('Confirmer', style: TextStyle(color: Color(0xFFE91E63))),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source, imageQuality: 70); // Qualité réduite
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 70);
     setState(() {
       if (pickedFile != null) {
         _productPhoto = File(pickedFile.path);
@@ -454,15 +303,88 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
     });
   }
 
-  Future<void> _pickFile(
-      FileType fileType, Function(File?) onFileSelected) async {
+  Future<void> _pickFile(FileType fileType, List<String>? allowedExtensions,
+      Function(File?) onFileSelected) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: fileType,
+      allowedExtensions: allowedExtensions,
     );
 
     if (result != null && result.files.single.path != null) {
       onFileSelected(File(result.files.single.path!));
     }
+  }
+
+  void _showSelectionBottomSheet({
+    required List<String> items,
+    required String? selectedItem,
+    required Function(String) onItemSelected,
+    bool showButton = true,
+    String? title,
+  }) {
+    Get.bottomSheet(
+      SizedBox(
+        height: Get.height * 0.6,
+        child: Column(
+          children: [
+            if (title != null)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  return ListTile(
+                    title: Text(item),
+                    trailing: selectedItem == item
+                        ? const Icon(Icons.check, color: Color(0xFFE91E63))
+                        : null,
+                    onTap: () {
+                      onItemSelected(item);
+                      if (!showButton) {
+                        Get.back();
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+            if (showButton)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton(
+                  onPressed: () => Get.back(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE91E63),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  child: const Text('Choisir'),
+                ),
+              ),
+          ],
+        ),
+      ),
+      backgroundColor: Colors.white,
+      elevation: 20,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+    );
   }
 
   void _showCategorySelection() {
@@ -471,30 +393,39 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
         height: Get.height * 0.7,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
               child: Text(
-                'Sélectionner une Catégorie',
-                style: Get.textTheme.headlineSmall
-                    ?.copyWith(color: const Color(0xFFE91E63)),
+                'Catégorie du produit',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
             ),
             Expanded(
-              child: ListView.builder(
-                itemCount: categories.keys.length,
-                itemBuilder: (context, index) {
-                  String category = categories.keys.elementAt(index);
-                  return ListTile(
-                    title: Text(category),
-                    trailing: const Icon(Icons.arrow_forward_ios,
-                        color: Colors.black54, size: 20),
-                    onTap: () {
-                      Get.back();
-                      _showSubCategorySelection(category);
-                    },
-                  );
-                },
-              ),
+              child: Obx(() {
+                if (_productController.isLoadingCategories.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return ListView.builder(
+                  itemCount: _productController.productCategories.length,
+                  itemBuilder: (context, index) {
+                    ProductCategoryModel category =
+                        _productController.productCategories[index];
+                    return ListTile(
+                      title: Text(category.categoryName),
+                      trailing: const Icon(Icons.arrow_forward_ios,
+                          color: Colors.black54, size: 20),
+                      onTap: () {
+                        Get.back();
+                        _showSubCategorySelection(category);
+                      },
+                    );
+                  },
+                );
+              }),
             ),
           ],
         ),
@@ -507,128 +438,51 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
     );
   }
 
-  void _showSubCategorySelection(String category) {
-    List<String> subCategories = categories[category]!;
-    Get.bottomSheet(
-      SizedBox(
-        height: Get.height * 0.6,
-        child: Column(
-          children: [
-              Expanded(
-              child: ListView.builder(
-                itemCount: subCategories.length,
-                itemBuilder: (context, index) {
-                  final subCategory = subCategories[index];
-                  return ListTile(
-                    title: Text(subCategory),
-                    trailing: _selectedSubCategory == subCategory
-                        ? const Icon(Icons.check, color: Color(0xFFE91E63))
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        _selectedCategory = category;
-                        _selectedSubCategory = subCategory;
-                      });
-                      Get.back();
-                    },
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(
-                onPressed: () {
-                  Get.back();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE91E63),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: const Text('Choisir'),
-              ),
-            ),
-          ],
-        ),
-      ),
-      backgroundColor: Colors.white,
-      elevation: 20,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+  void _showSubCategorySelection(ProductCategoryModel category) {
+    List<String> subCategories =
+        category.subCategories.map((e) => e.categoryName).toList();
+    _showSelectionBottomSheet(
+      title: 'Sous-catégorie du produit',
+      items: subCategories,
+      selectedItem: _selectedSubCategory,
+      onItemSelected: (subCategory) {
+        setState(() {
+          _selectedCategoryId = category.categoryId;
+          _selectedCategoryName = category.categoryName;
+          _selectedSubCategory = subCategory;
+        });
+      },
+      showButton: false,
     );
   }
 
   void _showWarrantyTypeSelection() {
-    Get.bottomSheet(
-      SizedBox(
-        height: Get.height * 0.6,
-        child: Column(
-          children: [
-          Expanded(
-              child: ListView.builder(
-                itemCount: warrantyTypes.length,
-                itemBuilder: (context, index) {
-                  final type = warrantyTypes[index];
-                  return ListTile(
-                    title: Text(type),
-                    trailing: _selectedWarrantyType == type
-                        ? const Icon(Icons.check, color: Color(0xFFE91E63))
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        _selectedWarrantyType = type;
-                      });
-                      Get.back();
-                    },
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(
-                onPressed: () {
-                  Get.back();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE91E63),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: const Text('Choisir'),
-              ),
-            ),
-          ],
-        ),
-      ),
-      backgroundColor: Colors.white,
-      elevation: 20,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+    _showSelectionBottomSheet(
+      title: 'Type de Garantie',
+      items: warrantyTypes,
+      selectedItem: _selectedWarrantyType,
+      onItemSelected: (type) {
+        setState(() {
+          _selectedWarrantyType = type;
+        });
+      },
+      showButton: false,
     );
   }
 
-  Future<void> _pickAndSetDate(BuildContext context, TextEditingController controller) async {
+  Future<void> _pickAndSetDate(
+      BuildContext context, TextEditingController controller) async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
+      firstDate: DateTime(1900),
       lastDate: DateTime(2101),
       builder: (BuildContext context, Widget? child) {
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFFE91E63), 
-              onPrimary: Colors.white, 
+              primary: Color(0xFFE91E63),
+              onPrimary: Colors.white,
               onSurface: Colors.black,
             ),
             dialogBackgroundColor: Colors.white,
@@ -639,18 +493,33 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
     );
     if (pickedDate != null) {
       setState(() {
-        controller.text = DateFormat('yyyy-MM-dd').format(pickedDate);
+        controller.text = DateFormat('dd/MM/yyyy').format(pickedDate);
       });
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color.fromARGB(248, 255, 255, 255),
       body: Column(
         children: [
-          StepProgressIndicator(currentStep: _currentStep, totalSteps: 3),
+          Padding(
+            padding: const EdgeInsets.only(top: 40),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                    child:
+                        StepProgressIndicator(currentStep: _currentStep, totalSteps: 3)),
+                IconButton(
+                  icon: const Icon(Icons.close,
+                      color: Color.fromARGB(255, 86, 86, 86), size: 30),
+                  onPressed: _showExitConfirmationDialog,
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: PageView(
               controller: _pageController,
@@ -670,14 +539,15 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
                     manufactureDateController: _manufactureDateController,
                     referenceController: _referenceController,
                     supplierController: _supplierController,
-                    selectedCategory: _selectedCategory,
+                    selectedCategory: _selectedCategoryName,
                     selectedSubCategory: _selectedSubCategory,
                     onCategoryTap: _showCategorySelection,
                     selectedWarrantyType: _selectedWarrantyType,
                     onWarrantyTypeTap: _showWarrantyTypeSelection,
                     productPhoto: _productPhoto,
                     onPickImage: _pickImage,
-                    onSelectManufactureDate: () => _pickAndSetDate(context, _manufactureDateController), 
+                    onSelectManufactureDate: () =>
+                        _pickAndSetDate(context, _manufactureDateController),
                   ),
                 ),
                 SingleChildScrollView(
@@ -688,7 +558,8 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
                     endDateController: _endDateController,
                     purchaseDateController: _purchaseDateController,
                     sellerNameController: _sellerNameController,
-                    onSelectDate: (controller) => _pickAndSetDate(context, controller), 
+                    onSelectDate: (controller) =>
+                        _pickAndSetDate(context, controller),
                   ),
                 ),
                 SingleChildScrollView(
@@ -699,7 +570,7 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
                     certificateFile: _certificateFile,
                     notesController: _notesController,
                     pickFile: _pickFile,
-                    onPickInvoice: _updateInvoiceFile, 
+                    onPickInvoice: _updateInvoiceFile,
                     onPickCertificate: _updateCertificateFile,
                   ),
                 ),
@@ -710,10 +581,25 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
             padding: const EdgeInsets.all(20.0),
             child: Row(
               children: [
+                if (_currentStep > 0 && _currentStep < 2)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _previousStep,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFE91E63),
+                        side: const BorderSide(color: Color(0xFFE91E63)),
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: const Text('Retour'),
+                    ),
+                  ),
                 if (_currentStep > 0) const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _nextStep,
+                    onPressed: _isLoading ? null : _nextStep,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFE91E63),
                       foregroundColor: Colors.white,
@@ -722,7 +608,11 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    child: Text(_currentStep < 2 ? 'Suivant' : 'Ajouter Garantie'),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(
+                            color: Colors.white,
+                          )
+                        : Text(_currentStep < 2 ? 'Suivant' : 'Ajouter Garantie'),
                   ),
                 ),
               ],
@@ -733,7 +623,6 @@ class _AddWarrantyPageState extends State<AddWarrantyPage> {
     );
   }
 
-  // Fonctions UPDATE FILE
   void _updateInvoiceFile(File? file) {
     setState(() {
       _invoiceFile = file;

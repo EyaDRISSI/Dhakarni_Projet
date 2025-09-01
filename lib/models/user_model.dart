@@ -1,4 +1,3 @@
-import 'package:firebase_database/firebase_database.dart'; 
 
 class UserModel {
   
@@ -13,8 +12,6 @@ class UserModel {
   final String? birthDate;      
   final String? website;        
 
-  /// Constructeur de la classe `UserModel`.
-  ///   initialiser un objet UserModel.
   UserModel({
     required this.userId,
     required this.email,
@@ -44,7 +41,6 @@ class UserModel {
     );
   }
 
-  /// Méthode pour convertir l'instance actuelle de `UserModel` en un `Map<String, dynamic>`.
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
