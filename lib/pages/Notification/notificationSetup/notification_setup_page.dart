@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../../controller/notification_controller.dart';
 import '../../../../models/warranty_model.dart';
-import '../../Notification/notification_success_page.dart';
 import '../../warranty/add-warranty/steps/success_warranty_page.dart';
 
 class NotificationSetupPage extends StatefulWidget {

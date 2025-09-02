@@ -1,21 +1,21 @@
 import 'package:get/get.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'dart:developer';
-import 'dart:io';
-import 'package:uuid/uuid.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import './notification_controller.dart';
-import '../models/warranty_model.dart';
-import '../models/product_model.dart';
-import './product_controller.dart';
-import '../models/product_category_model.dart';
+ import 'package:firebase_database/firebase_database.dart';
+ import 'dart:developer';
+ import 'dart:io';
+ import 'package:uuid/uuid.dart';
+ import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:http/http.dart' as http;
+ import 'dart:convert';
+ import './notification_controller.dart';
+ import '../models/warranty_model.dart';
+ import '../models/product_model.dart';
+ import './product_controller.dart';
+ import '../models/product_category_model.dart';
 
-const String CLOUDINARY_CLOUD_NAME = 'ddwjxlj6e';
-const String CLOUDINARY_UPLOAD_PRESET = 'Dhakarni';
+ const String CLOUDINARY_CLOUD_NAME = 'ddwjxlj6e';
+ const String CLOUDINARY_UPLOAD_PRESET = 'Dhakarni';
 
-class WarrantyController extends GetxController {
+ class WarrantyController extends GetxController {
   final DatabaseReference _databaseRef = FirebaseDatabase.instance.ref();
   final Uuid _uuid = const Uuid();
   late final ProductController _productController;
@@ -99,6 +99,7 @@ class WarrantyController extends GetxController {
     }
   }
 
+  
   Future<WarrantyModel> addWarranty({
     required String userId,
     required String productName,
@@ -124,71 +125,53 @@ class WarrantyController extends GetxController {
     successMessage.value = '';
 
     try {
-      final ProductCategoryModel? parentCategory = _productController
-          .productCategories
-          .firstWhereOrNull((cat) => cat.categoryId == productCategoryId);
-      final ProductCategoryModel? subCategory = parentCategory?.subCategories
-          .firstWhereOrNull((sub) => sub.categoryName == productSubCategoryName);
+      final String warrantyId = generateUniqueId();
+      final String productId = generateUniqueId();
+      
+      final List<Future<String?>> uploadFutures = [
+        if (productPhotoFile != null) uploadFile(productPhotoFile, 'product_photos'),
+        if (invoiceFile != null) uploadFile(invoiceFile, 'invoice_files'),
+        if (certificateFile != null) uploadFile(certificateFile, 'certificate_files'),
+      ];
 
-      final ProductCategoryModel? finalProductCategory;
-      if (parentCategory != null && subCategory != null) {
-        finalProductCategory = ProductCategoryModel(
-          categoryId: parentCategory.categoryId,
-          categoryName: parentCategory.categoryName,
-          subCategories: [subCategory],
-        );
-      } else {
-        throw Exception("Catégorie ou sous-catégorie non trouvée.");
-      }
-
-      ProductModel? existingProduct = _productController.products
-          .firstWhereOrNull((p) => p.reference == reference);
-
-      final ProductModel finalProduct;
-      if (existingProduct != null) {
-        finalProduct = existingProduct.copyWith(
-          productName: productName,
-          productCategory: finalProductCategory,
-          price: price,
-          reference: reference,
-          manufacturingDate: manufactureDate,
-          supplier: supplier,
-        );
-        await _productController.updateProduct(finalProduct);
-      } else {
-        final newProduct = ProductModel(
-          productId: generateUniqueId(),
-          productName: productName,
-          productCategory: finalProductCategory,
-          price: price,
-          reference: reference,
-          manufacturingDate: manufactureDate,
-          supplier: supplier,
-        );
-        finalProduct = await _productController.addProduct(newProduct);
-      }
+      final uploadResults = await Future.wait(uploadFutures);
       
       String? productPhotoUrl;
       String? invoiceUrl;
       String? certificateUrl;
-
-      await Future.wait([
-        if (productPhotoFile != null)
-          uploadFile(productPhotoFile, 'product_photos').then((url) => productPhotoUrl = url),
-        if (invoiceFile != null)
-          uploadFile(invoiceFile, 'invoice_files').then((url) => invoiceUrl = url),
-        if (certificateFile != null)
-          uploadFile(certificateFile, 'certificate_files').then((url) => certificateUrl = url),
-      ]);
       
-      final updatedProduct = finalProduct.copyWith(productPhotoUrl: productPhotoUrl);
-      await _productController.updateProduct(updatedProduct);
+      int uploadIndex = 0;
+      if (productPhotoFile != null) productPhotoUrl = uploadResults[uploadIndex++];
+      if (invoiceFile != null) invoiceUrl = uploadResults[uploadIndex++];
+      if (certificateFile != null) certificateUrl = uploadResults[uploadIndex++];
 
-      final String warrantyId = generateUniqueId();
+      final ProductCategoryModel finalProductCategory = ProductCategoryModel(
+        categoryId: productCategoryId,
+        categoryName: productCategoryName,
+        subCategories: [
+          ProductCategoryModel(
+            categoryId: generateUniqueId(),
+            categoryName: productSubCategoryName,
+            subCategories: [],
+          ),
+        ],
+      );
+
+      final ProductModel finalProduct = ProductModel(
+        productId: productId,
+        productName: productName,
+        productCategory: finalProductCategory,
+        price: price,
+        reference: reference,
+        manufacturingDate: manufactureDate,
+        supplier: supplier,
+        productPhotoUrl: productPhotoUrl,
+      );
+
       final WarrantyModel newWarranty = WarrantyModel(
         id: warrantyId,
         userId: userId,
-        productId: updatedProduct.productId,
+        productId: finalProduct.productId,
         warrantyType: warrantyType,
         startDate: startDate,
         endDate: endDate,
@@ -196,17 +179,18 @@ class WarrantyController extends GetxController {
         sellerName: sellerName,
         notes: notes,
         createdAt: DateTime.now(),
-        product: updatedProduct,
+        product: finalProduct,
         invoiceFilePath: invoiceUrl,
         certificateFilePath: certificateUrl,
       );
+      
+      final Map<String, dynamic> updates = {};
+      updates['products/$productId'] = finalProduct.toJson();
+      updates['warranties_by_user/$userId/$warrantyId'] = newWarranty.toJson();
 
-      await _databaseRef
-          .child('warranties_by_user')
-          .child(userId)
-          .child(newWarranty.id!)
-          .set(newWarranty.toJson());
+      await _databaseRef.update(updates);
 
+      _productController.products.add(finalProduct);
       _allWarranties.add(newWarranty);
       filterWarranties(searchTerm.value);
 
@@ -224,6 +208,7 @@ class WarrantyController extends GetxController {
     }
   }
 
+
   Future<void> updateWarranty({
     required WarrantyModel updatedWarranty,
     File? productPhotoFile,
@@ -238,38 +223,42 @@ class WarrantyController extends GetxController {
       if (updatedWarranty.id == null || userId.value.isEmpty) {
         throw Exception("ID de garantie ou ID utilisateur manquant.");
       }
+      
+      final List<Future<String?>> uploadFutures = [
+        if (productPhotoFile != null) uploadFile(productPhotoFile, 'product_photos'),
+        if (invoiceFile != null) uploadFile(invoiceFile, 'invoice_files'),
+        if (certificateFile != null) uploadFile(certificateFile, 'certificate_files'),
+      ];
+
+      final uploadResults = await Future.wait(uploadFutures);
 
       String? productPhotoUrl;
       String? invoiceUrl;
       String? certificateUrl;
 
-      await Future.wait([
-        if (productPhotoFile != null)
-          uploadFile(productPhotoFile, 'product_photos').then((url) => productPhotoUrl = url),
-        if (invoiceFile != null)
-          uploadFile(invoiceFile, 'invoice_files').then((url) => invoiceUrl = url),
-        if (certificateFile != null)
-          uploadFile(certificateFile, 'certificate_files').then((url) => certificateUrl = url),
-      ]);
+      int uploadIndex = 0;
+      if (productPhotoFile != null) productPhotoUrl = uploadResults[uploadIndex++];
+      if (invoiceFile != null) invoiceUrl = uploadResults[uploadIndex++];
+      if (certificateFile != null) certificateUrl = uploadResults[uploadIndex++];
 
       final updatedProduct = updatedWarranty.product?.copyWith(
-        productPhotoUrl: productPhotoUrl,
+        productPhotoUrl: productPhotoUrl ?? updatedWarranty.product?.productPhotoUrl,
       );
+
       final newLocalWarranty = updatedWarranty.copyWith(
         product: updatedProduct,
         invoiceFilePath: invoiceUrl ?? updatedWarranty.invoiceFilePath,
         certificateFilePath: certificateUrl ?? updatedWarranty.certificateFilePath,
       );
 
+      final Map<String, dynamic> updates = {};
       if (updatedProduct != null) {
-        await _productController.updateProduct(updatedProduct);
+        updates['products/${updatedProduct.productId}'] = updatedProduct.toJson();
       }
-      await _databaseRef
-          .child('warranties_by_user')
-          .child(userId.value)
-          .child(newLocalWarranty.id!)
-          .update(newLocalWarranty.toJson());
+      updates['warranties_by_user/${userId.value}/${newLocalWarranty.id}'] = newLocalWarranty.toJson();
 
+      await _databaseRef.update(updates);
+      
       final index = _allWarranties.indexWhere((w) => w.id == updatedWarranty.id);
       if (index != -1) {
         _allWarranties[index] = newLocalWarranty;
@@ -413,7 +402,7 @@ class WarrantyController extends GetxController {
 
       final recipientUserSnapshot = await _databaseRef
           .child('users_by_email')
-          .child(recipientEmail.replaceAll('.', ',')) 
+          .child(recipientEmail.replaceAll('.', ','))
           .once();
 
       if (recipientUserSnapshot.snapshot.value == null) {
@@ -430,7 +419,6 @@ class WarrantyController extends GetxController {
         throw Exception("Garantie non trouvée.");
       }
 
-      // Créer une demande de migration
       final migrationRef = _databaseRef
           .child('pending_migrations')
           .child(recipientUserId)
@@ -438,7 +426,7 @@ class WarrantyController extends GetxController {
       
       await migrationRef.set({
         'senderId': currentUserId,
-        'senderEmail': currentUserEmail, 
+        'senderEmail': currentUserEmail,
         'warrantyId': warrantyId,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
@@ -453,4 +441,4 @@ class WarrantyController extends GetxController {
       isLoading.value = false;
     }
   }
-}
+ }
