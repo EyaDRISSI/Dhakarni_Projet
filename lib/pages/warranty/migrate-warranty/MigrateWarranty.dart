@@ -23,17 +23,7 @@ class _MigrateWarrantyPageState extends State<MigrateWarrantyPage> {
     super.dispose();
   }
 
-  Future<void> _migrateWarranty() async {
-    if (_formKey.currentState!.validate()) {
-      await _warrantyController.requestWarrantyMigration(
-        widget.warranty.id!,
-        _emailController.text.trim(),
-      );
-      if (_warrantyController.successMessage.value.isNotEmpty) {
-        Get.back();
-      }
-    }
-  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +91,7 @@ class _MigrateWarrantyPageState extends State<MigrateWarrantyPage> {
                 width: double.infinity,
                 child: Obx(
                   () => ElevatedButton(
-                    onPressed: _warrantyController.isLoading.value ? null : _migrateWarranty,
+                    onPressed: null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: customPink,
                       foregroundColor: Colors.white,

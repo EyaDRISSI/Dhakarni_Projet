@@ -1,3 +1,5 @@
+// Dans notification_details.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -17,7 +19,6 @@ class NotificationDetailsPage extends StatefulWidget {
 class _NotificationDetailsPageState extends State<NotificationDetailsPage> {
   final WarrantyController warrantyController = Get.find<WarrantyController>();
   final Rx<WarrantyModel?> _warranty = Rx<WarrantyModel?>(null);
-  // Ajoutez cette variable réactive pour gérer l'état de chargement
   final RxBool _isLoading = true.obs; 
 
   @override
@@ -27,8 +28,9 @@ class _NotificationDetailsPageState extends State<NotificationDetailsPage> {
   }
 
   Future<void> _fetchWarrantyDetails() async {
-    _isLoading.value = true; // Mettez à jour l'état de chargement à true
+    _isLoading.value = true;
     try {
+      // Utilisez la méthode améliorée du contrôleur.
       final warranty = await warrantyController.getWarrantyById(widget.notification.warrantyId);
       if (mounted) {
         _warranty.value = warranty;
@@ -39,11 +41,14 @@ class _NotificationDetailsPageState extends State<NotificationDetailsPage> {
         _warranty.value = null;
       }
     } finally {
-      _isLoading.value = false; // Mettez à jour l'état de chargement à false, qu'il y ait une erreur ou non
+      if (mounted) {
+        _isLoading.value = false;
+      }
     }
   }
 
   String _getTimeRemainingInDays(DateTime endDate) {
+    // ... (unchanged code)
     final now = DateTime.now();
     final difference = endDate.difference(now);
     final days = difference.inDays;
@@ -79,17 +84,17 @@ class _NotificationDetailsPageState extends State<NotificationDetailsPage> {
         centerTitle: true,
       ),
       body: Obx(() {
-        if (_isLoading.value) { // Vérifiez l'état de chargement
+        if (_isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
 
         final warranty = _warranty.value;
-        if (warranty == null) {
-          // Affichez un message d'erreur si la garantie n'a pas pu être trouvée
+        if (warranty == null || warranty.product == null) {
           return const Center(
             child: Text(
-              'Garantie non trouvée.',
+              'Garantie non trouvée ou données incomplètes.',
               style: TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
             ),
           );
         }
@@ -102,7 +107,7 @@ class _NotificationDetailsPageState extends State<NotificationDetailsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Il vous reste $remainingDaysText avant la fin de la garantie.',
+                'le garantie  $remainingDaysText avant la fin de la garantie.',
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -150,7 +155,6 @@ class _NotificationDetailsPageState extends State<NotificationDetailsPage> {
   }
 
   Widget _buildInfoRow({required IconData icon, required String label, required String value}) {
-    // ... (unchanged code)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(

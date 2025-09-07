@@ -326,39 +326,50 @@ import 'package:get/get.dart';
     }
   }
 
-  Future<WarrantyModel?> getWarrantyById(String warrantyId) async {
-    try {
-      final User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        log('Erreur: Utilisateur non authentifié.');
-        return null;
-      }
+// Dans WarrantyController.dart
 
-      final DatabaseEvent event = await _databaseRef
-          .child('warranties_by_user')
-          .child(currentUser.uid)
-          .child(warrantyId)
-          .once();
+Future<WarrantyModel?> getWarrantyById(String warrantyId) async {
+  try {
+    // Étape 1 : Vérifier si la garantie est déjà en mémoire
+    final cachedWarranty = _allWarranties.firstWhereOrNull((w) => w.id == warrantyId);
+    if (cachedWarranty != null) {
+      log('DEBUG: Garantie trouvée en cache pour l\'ID: $warrantyId');
+      return cachedWarranty;
+    }
 
-      final data = event.snapshot.value;
-
-      if (data != null && data is Map<dynamic, dynamic>) {
-        final warrantyMap = Map<String, dynamic>.from(data);
-        final warranty = WarrantyModel.fromMap(warrantyMap, id: warrantyId);
-        final product = await _productController.getProductById(warranty.productId);
-
-        if (product != null) {
-          warranty.product = product;
-          return warranty;
-        }
-      }
-      return null;
-    } catch (e) {
-      log('ERROR: Erreur lors de la récupération de la garantie: $e');
+    // Étape 2 : Si elle n'est pas en cache, la récupérer depuis la base de données
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      log('Erreur: Utilisateur non authentifié.');
       return null;
     }
-  }
 
+    final DatabaseEvent event = await _databaseRef
+        .child('warranties_by_user')
+        .child(currentUser.uid)
+        .child(warrantyId)
+        .once();
+    
+    final data = event.snapshot.value;
+    if (data != null && data is Map<dynamic, dynamic>) {
+      final warrantyMap = Map<String, dynamic>.from(data);
+      final warranty = WarrantyModel.fromMap(warrantyMap, id: warrantyId);
+
+      if (warranty.product != null) {
+        log('DEBUG: Garantie récupérée depuis la base de données pour l\'ID: $warrantyId');
+        _allWarranties.add(warranty); 
+        return warranty;
+      }
+    }
+    
+    log('Erreur: Garantie introuvable ou incomplète dans la base de données pour l\'ID: $warrantyId');
+    return null;
+
+  } catch (e) {
+    log('ERROR: Erreur lors de la récupération de la garantie par ID: $e');
+    return null;
+  }
+}
   Future<void> deleteWarranty(String warrantyId) async {
     isLoading.value = true;
     errorMessage.value = '';
@@ -389,56 +400,4 @@ import 'package:get/get.dart';
     }
   }
 
-  Future<void> requestWarrantyMigration(String warrantyId, String recipientEmail) async {
-    isLoading.value = true;
-    errorMessage.value = '';
-
-    try {
-      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-      final currentUserEmail = FirebaseAuth.instance.currentUser?.email;
-      if (currentUserId == null || currentUserEmail == null) {
-        throw Exception("Utilisateur non authentifié.");
-      }
-
-      final recipientUserSnapshot = await _databaseRef
-          .child('users_by_email')
-          .child(recipientEmail.replaceAll('.', ','))
-          .once();
-
-      if (recipientUserSnapshot.snapshot.value == null) {
-        throw Exception("L'utilisateur avec cet email n'existe pas.");
-      }
-      final recipientUserId = recipientUserSnapshot.snapshot.value as String;
-
-      if (recipientUserId == currentUserId) {
-        throw Exception("Vous ne pouvez pas vous transférer une garantie à vous-même.");
-      }
-
-      final existingWarranty = _allWarranties.firstWhereOrNull((w) => w.id == warrantyId);
-      if (existingWarranty == null) {
-        throw Exception("Garantie non trouvée.");
-      }
-
-      final migrationRef = _databaseRef
-          .child('pending_migrations')
-          .child(recipientUserId)
-          .child(warrantyId);
-      
-      await migrationRef.set({
-        'senderId': currentUserId,
-        'senderEmail': currentUserEmail,
-        'warrantyId': warrantyId,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      });
-
-      successMessage.value = 'Demande de migration envoyée avec succès.';
-      Get.snackbar('Succès', 'Demande de migration envoyée à $recipientEmail.');
-
-    } catch (e) {
-      errorMessage.value = "Erreur: ${e.toString()}";
-      Get.snackbar('Erreur', 'Échec de l\'envoi de la demande: ${e.toString()}', snackPosition: SnackPosition.BOTTOM);
-    } finally {
-      isLoading.value = false;
-    }
-  }
  }

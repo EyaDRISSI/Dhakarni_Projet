@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../controller/notification_controller.dart';
+import '../../../controller/warranty_controller.dart';
 import '../../../models/notification_model.dart';
+import '../../../models/warranty_model.dart';
 import 'notification_details.dart';
 
 class NotificationHistoryPage extends StatelessWidget {
@@ -10,7 +12,9 @@ class NotificationHistoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Correction 1: Obtenir à la fois le NotificationController et le WarrantyController
     final NotificationController notificationController = Get.find<NotificationController>();
+    final WarrantyController warrantyController = Get.find<WarrantyController>();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -32,13 +36,17 @@ class NotificationHistoryPage extends StatelessWidget {
         centerTitle: true,
       ),
       body: Obx(() {
-        final List<NotificationModel> notifications = notificationController.notifications;
-
         if (notificationController.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (notifications.isEmpty) {
+        // Correction 2: Filtrer les notifications
+        // On ne garde que les notifications dont la garantie associée est présente dans la liste des garanties du WarrantyController.
+        final List<NotificationModel> filteredNotifications = notificationController.notifications.where((notification) {
+          return warrantyController.allWarranties.any((warranty) => warranty.id == notification.warrantyId);
+        }).toList();
+
+        if (filteredNotifications.isEmpty) {
           return const Center(
             child: Text(
               'Aucune notification à afficher.',
@@ -51,7 +59,7 @@ class NotificationHistoryPage extends StatelessWidget {
         }
 
         final Map<String, List<NotificationModel>> groupedNotifications = {};
-        for (var notification in notifications) {
+        for (var notification in filteredNotifications) {
           final String formattedDate = _getFormattedDate(notification.scheduledDate);
           if (!groupedNotifications.containsKey(formattedDate)) {
             groupedNotifications[formattedDate] = [];
@@ -87,7 +95,7 @@ class NotificationHistoryPage extends StatelessWidget {
                   itemCount: notificationsForDate.length,
                   itemBuilder: (context, innerIndex) {
                     final notification = notificationsForDate[innerIndex];
-                    return _buildNotificationCard(context, notification);
+                    return _buildNotificationCard(context, notification, warrantyController);
                   },
                 ),
               ],
@@ -98,9 +106,18 @@ class NotificationHistoryPage extends StatelessWidget {
     );
   }
 
-  Widget _buildNotificationCard(BuildContext context, NotificationModel notification) {
+  Widget _buildNotificationCard(BuildContext context, NotificationModel notification, WarrantyController warrantyController) {
+    final WarrantyModel? associatedWarranty = warrantyController.allWarranties.firstWhereOrNull((w) => w.id == notification.warrantyId);
+    if (associatedWarranty == null) {
+      return const SizedBox.shrink(); 
+    }
+
+    final String title = notification.customName ?? 'Rappel de Garantie';
+    final String body = 'Rappel pour la garantie de votre produit : ${associatedWarranty.product?.productName ?? 'Produit Inconnu'}';
+
     return InkWell(
       onTap: () {
+        // Correction 5: On passe l'objet de notification complet, l'objet de garantie sera re-récupéré dans la page de détails
         Get.to(() => NotificationDetailsPage(notification: notification));
       },
       child: Container(
@@ -120,7 +137,7 @@ class NotificationHistoryPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    notification.customName ?? 'Notification de garantie',
+                    title,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -128,7 +145,7 @@ class NotificationHistoryPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    'Votre garantie ${notification.warrantyId.substring(0, 8)}... arrive à expiration ! Ne manquez pas l\'occasion...',
+                    body,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -145,7 +162,6 @@ class NotificationHistoryPage extends StatelessWidget {
                 ],
               ),
             ),
-          
           ],
         ),
       ),

@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import '../migrate-warranty/MigrateOrReceivePage.dart';
 import './RemindersTabContent.dart';
 
+
 class WarrantyDetailsPage extends StatefulWidget {
   final WarrantyModel warranty;
   const WarrantyDetailsPage({Key? key, required this.warranty}) : super(key: key);
